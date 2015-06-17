@@ -3,6 +3,8 @@ import Chisel._
 class Testbench extends Module {
 	val io = new Bundle {}
 	val top = Module(new Top(32))
+	val systemMemory = Module(new AxiSram(32, 1024))
+	top.io.axiBus <> systemMemory.io
 }
 
 object main {

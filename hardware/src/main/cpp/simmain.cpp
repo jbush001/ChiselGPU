@@ -24,5 +24,8 @@ int main (int argc, char* argv[])
 	}
 
 	fclose(f);
+
+	// Write memory conntents
+	module->Testbench_systemMemory__memory.print();
 }
 
