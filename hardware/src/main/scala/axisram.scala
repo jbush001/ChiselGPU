@@ -74,7 +74,7 @@ class AxiSram(dataWidth : Int, size : Int) extends Module {
 		is (s_read_burst) {
 			memoryReadValid := Bool(true)
 			when (io.rready) {
-				when (burstCount === UInt(1)) {
+				when (burstCount === UInt(0)) {
 					state := s_idle
 					memoryReadValid := Bool(false)
 				}
@@ -87,7 +87,7 @@ class AxiSram(dataWidth : Int, size : Int) extends Module {
 		is (s_write_burst) {
 			when (io.wvalid) {
 				memory(burstAddress) := io.wdata
-				when (burstCount === UInt(1)) {
+				when (burstCount === UInt(0)) {
 					state := s_write_ack
 				}
 				.otherwise {

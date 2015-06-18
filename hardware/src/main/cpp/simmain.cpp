@@ -44,7 +44,7 @@ int main (int argc, char* argv[])
    	module->clock_hi(dat_t<1>(1));
 	module->mod_t::dump();	// Write initial waveform values
 
-	for (int cycle = 0; cycle < 8192; cycle++)
+	for (int cycle = 0; cycle < 20000; cycle++)
 	{
 	    module->clock_lo(dat_t<1>(0));
 	   	module->clock_hi(dat_t<1>(0));
