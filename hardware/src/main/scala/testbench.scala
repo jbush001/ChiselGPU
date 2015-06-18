@@ -9,10 +9,11 @@ class Testbench extends Module {
 
 object main {
 	def main(args: Array[String]): Unit = {
-		// Generate different modules depending if we are in simulation or synthesis
 		if (args.contains("v")) {
+			// For synthesis, generate only 'Top' module
 			chiselMain(args, () => Module(new Top(32)))
 		} else {
+			// For simulation, create Testbench wrapper
 			chiselMain(args, () => Module(new Testbench()))
 		}
 	}

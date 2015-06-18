@@ -1,5 +1,6 @@
+# Setup
 
-# Getting Started
+This implementation uses the Chisel hardware construction language:
 
 https://chisel.eecs.berkeley.edu/
 
@@ -10,8 +11,8 @@ https://chisel.eecs.berkeley.edu/
 - SBT 0.13.0+ (http://www.scala-sbt.org/)
 - ImageMagick
 
-SBT (Scala build tool) will automatically download and install remaining 
-dependencies
+SBT (Scala build tool) will automatically download and install the remaining 
+dependencies, including Scala and the Chisel library.
 
 ## Set up on Linux
 
@@ -23,9 +24,12 @@ Download and install Java from here:
 
 https://java.com/en/download/help/mac_install.xml
 
-Then:
+If the system compiler is not already installed:
 
 xcode-select --install
+
+Finally:
+
 sudo port install sbt imagemagick
 
 # Running
@@ -34,3 +38,5 @@ cd hardware
 make run
 
 Output framebuffer is written to 'output.png'
+The simulator writes a waveform trace to 'trace.vcd'
+

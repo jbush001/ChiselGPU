@@ -16,6 +16,10 @@
 
 import Chisel._
 
+//
+// SRAM with AXI bus interface
+//
+
 class AxiSram(dataWidth : Int, size : Int) extends Module {
 	val io = new Axi4Master(dataWidth).flip
 	
