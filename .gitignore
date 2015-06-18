@@ -1,5 +1,7 @@
 .DS_Store
 *.vcd
+*.bin
+*.png
 hardware/project
 hardware/target
 hardware/generated_cpp

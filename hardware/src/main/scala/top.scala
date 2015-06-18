@@ -5,9 +5,11 @@ class Top (dataWidth : Int) extends Module {
 		val axiBus = new Axi4Master(dataWidth) 
 	}
 
-	val writeAddress = Reg(UInt(width=32))
-	val writeCount = Reg(UInt(width = 8))
-	val totalBursts = Reg(UInt(width = 8), init = UInt(8))
+	def makeColor(red : UInt, blue : UInt, green : UInt, alpha : UInt) = Cat(UInt(alpha, 8), 
+		UInt(blue, 8), UInt(green, 8), UInt(red, 8))
+
+	val writeAddress = Reg(UInt(width=32), init=UInt(0))
+	val burstCount = Reg(UInt(width = 8), init=UInt(0))
 
 	io.axiBus.bready := Bool(true)
 	io.axiBus.arvalid := Bool(false)
@@ -21,25 +23,25 @@ class Top (dataWidth : Int) extends Module {
 	io.axiBus.awlen := UInt(8)
 	io.axiBus.awsize := UInt(4)
 	io.axiBus.wvalid := state === s_write_burst
-	io.axiBus.wdata := writeAddress
+	io.axiBus.wdata := Mux((writeAddress(5) ^ writeAddress(11)) != UInt(0),
+		UInt("hff0000ff"), UInt("hff000000"))
 	io.axiBus.bready := state === s_write_ack
 
 	switch (state) {
 		is (s_send_addr) {
-			when (totalBursts != UInt(0)) {
-				writeCount := UInt(8)
+			when (writeAddress < UInt(64 * 64 * 4)) {
+				burstCount := UInt(8)
 				when (io.axiBus.awready) {
 					state := s_write_burst
-					totalBursts := totalBursts - UInt(1)
 				}
 			}
 		}
 		
 		is (s_write_burst) {
 			when (io.axiBus.wready) {
-				writeCount := writeCount - UInt(1)
+				burstCount := burstCount - UInt(1)
 				writeAddress := writeAddress + UInt(4)
-				when (writeCount === UInt(1)) {
+				when (burstCount === UInt(1)) {
 					state := s_write_ack
 				}
 			}
