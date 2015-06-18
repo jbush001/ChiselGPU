@@ -27,8 +27,12 @@ class AxiSram(dataWidth : Int, size : Int) extends Module {
 	val burstCount = Reg(UInt(width = 8))
 	io.wready := state === s_write_burst;
 	io.bvalid := state === s_write_ack;
-	io.rvalid := state === s_read_burst;
-	io.rdata <> memory(burstAddress)
+
+	val memoryReadValid = Reg(Bool(), init=Bool(false))
+	io.rvalid := memoryReadValid;
+	val memoryReadValue = Reg(UInt(width = 32))
+	memoryReadValue := memory(burstAddress)
+	io.rdata := memoryReadValue
 
 	val writeLatched = Reg(Bool())
 	val writeAddress = Reg(UInt(width=32))
@@ -64,9 +68,11 @@ class AxiSram(dataWidth : Int, size : Int) extends Module {
 			}
 		} 
 		is (s_read_burst) {
+			memoryReadValid := Bool(true)
 			when (io.rready) {
 				when (burstCount === UInt(1)) {
 					state := s_idle
+					memoryReadValid := Bool(false)
 				}
 				.otherwise {
 					burstAddress := burstAddress + UInt(1)

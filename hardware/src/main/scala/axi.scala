@@ -16,6 +16,10 @@
 
 import Chisel._
 
+//
+// AMBA AXI and ACE Protocol Specification, revision E
+// http://www.arm.com/products/system-ip/amba-specifications.php
+//
 class Axi4Master( dataWidth : Int ) extends Bundle {
 	// Write address channel (Table A2-2)   
 	val awvalid = Bool(OUTPUT)
