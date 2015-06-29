@@ -24,7 +24,7 @@ class Arbiter(numInputs : Int) extends Module {
 		val enableUpdate = Bool(INPUT)
 	}
 
-	var priorityOneHot = Reg(UInt(width = numInputs), init=UInt(1))
+	var priorityOneHotReg = Reg(UInt(width = numInputs), init=UInt(1))
 
 	var grantIndex = 0
 	var priorityIndex = 0
@@ -33,7 +33,7 @@ class Arbiter(numInputs : Int) extends Module {
 	for (grantIndex <- 0 until numInputs) {
 		var isGranted0 = Bool(false)
 		for (priorityIndex <- 0 until numInputs) {
-			var isGranted1 = io.request(grantIndex) & priorityOneHot(priorityIndex)
+			var isGranted1 = io.request(grantIndex) & priorityOneHotReg(priorityIndex)
 			for (bitIndex <- 0 until numInputs - 1)
 				isGranted1 = isGranted1 & !io.request((priorityIndex + bitIndex + 1) % numInputs)
 			
@@ -50,8 +50,8 @@ class Arbiter(numInputs : Int) extends Module {
 	
 	when (io.enableUpdate && io.request != UInt(0)) {
 		if (numInputs > 2)
-			priorityOneHot := Cat(priorityOneHot(numInputs - 2, 1), priorityOneHot(numInputs - 1))
+			priorityOneHotReg := Cat(priorityOneHotReg(numInputs - 2, 1), priorityOneHotReg(numInputs - 1))
 		else
-			priorityOneHot := ~priorityOneHot
+			priorityOneHotReg := ~priorityOneHotReg
 	}
 }

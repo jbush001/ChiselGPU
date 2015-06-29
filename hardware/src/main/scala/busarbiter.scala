@@ -67,60 +67,60 @@ class BusArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : Int
 	// Read Logic
 	//
 	val s_read_idle :: s_send_read_addr :: s_read_burst_active :: s_read_burst_complete :: Nil = Enum(UInt(), 4)
-	val readState = Reg(init = s_read_idle)
+	val readStateReg = Reg(init = s_read_idle)
 	val readDataReg = Reg(UInt(width = burstByteCount * 8))
-	val activeReader = Reg(UInt(width = log2Up(numReadPorts)))
-	val readBurstCount = Reg(UInt(width = log2Up(burstTransferCount)))
+	val activeReaderReg = Reg(UInt(width = log2Up(numReadPorts)))
+	val readBurstCountReg = Reg(UInt(width = log2Up(burstTransferCount)))
 
 	var i = 0
 	for (i <- 0 until numReadPorts ) {
 		io.readPorts(i).data := readDataReg
-		io.readPorts(i).ack := (readState === s_read_burst_complete) && 
-			(activeReader === UInt(i))
+		io.readPorts(i).ack := (readStateReg === s_read_burst_complete) && 
+			(activeReaderReg === UInt(i))
 	}
 
-	io.axiBus.arvalid := readState === s_send_read_addr
-	io.axiBus.araddr := io.readPorts(activeReader).address
+	io.axiBus.arvalid := readStateReg === s_send_read_addr
+	io.axiBus.araddr := io.readPorts(activeReaderReg).address
 	io.axiBus.arlen := UInt(burstTransferCount - 1)
 	io.axiBus.arsize := UInt(log2Down(burstByteCount))
-	io.axiBus.rready := readState === s_read_burst_active
+	io.axiBus.rready := readStateReg === s_read_burst_active
 	val readLanes = convertToVec(readDataReg, axiDataWidthBits)
 	val readArbiter = Module(new Arbiter(numReadPorts))
-	var readRequestBitmap = UInt(io.readPorts(0).request && readState === s_read_idle)
+	var readRequestBitmap = UInt(io.readPorts(0).request && readStateReg === s_read_idle)
 	for (i <- 1 until numReadPorts)
-		readRequestBitmap = Cat(io.readPorts(i).request && readState === s_read_idle, readRequestBitmap)
+		readRequestBitmap = Cat(io.readPorts(i).request && readStateReg === s_read_idle, readRequestBitmap)
 	
 	readArbiter.io.request := readRequestBitmap
 	readArbiter.io.enableUpdate := Bool(true)
 
-	switch (readState) {
+	switch (readStateReg) {
 		is (s_read_idle) {
 			when (readArbiter.io.grantOneHot != UInt(0)) {
 				// Choose a master to begin a read transaction
-				activeReader := OHToUInt(readArbiter.io.grantOneHot)
-				readState := s_send_read_addr
+				activeReaderReg := OHToUInt(readArbiter.io.grantOneHot)
+				readStateReg := s_send_read_addr
 			}
 		}
 		
 		is (s_send_read_addr) {
 			when (io.axiBus.arready) {
-				readState := s_read_burst_active
-				readBurstCount := UInt(0)
+				readStateReg := s_read_burst_active
+				readBurstCountReg := UInt(0)
 			}
 		}
 
 		is (s_read_burst_active) {
 			when (io.axiBus.rvalid) {
-				readLanes(~readBurstCount) := io.axiBus.rdata
-				readBurstCount := readBurstCount + UInt(1)
-				when (readBurstCount === UInt(burstTransferCount - 1)) {
-					readState := s_read_burst_complete
+				readLanes(~readBurstCountReg) := io.axiBus.rdata
+				readBurstCountReg := readBurstCountReg + UInt(1)
+				when (readBurstCountReg === UInt(burstTransferCount - 1)) {
+					readStateReg := s_read_burst_complete
 				}
 			}
 		}
 
 		is (s_read_burst_complete) {
-			readState := s_read_idle
+			readStateReg := s_read_idle
 		}
 	}
 
@@ -128,9 +128,9 @@ class BusArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : Int
 	// Write Logic
 	//
 	val s_write_idle :: s_send_write_addr :: s_write_burst_active :: s_write_burst_complete :: Nil = Enum(UInt(), 4)
-	val writeState = Reg(init = s_write_idle)
-	val activeWriter = Reg(UInt(width = log2Up(numWritePorts)))
-	val writeBurstCount = Reg(UInt(width = log2Up(burstTransferCount)))
+	val writeStateReg = Reg(init = s_write_idle)
+	val activeWriterReg = Reg(UInt(width = log2Up(numWritePorts)))
+	val writeBurstCountReg = Reg(UInt(width = log2Up(burstTransferCount)))
 
 	class WriteBuffer extends Bundle {
 		val latched = Bool()
@@ -148,62 +148,62 @@ class BusArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : Int
 			writeBuffers(i).address := io.writePorts(i).address
 			writeBuffers(i).data := io.writePorts(i).data
 		}
-		.elsewhen (writeState === s_write_burst_complete && activeWriter === UInt(i)) {
+		.elsewhen (writeStateReg === s_write_burst_complete && activeWriterReg === UInt(i)) {
 			assert(writeBuffers(i).latched, "Write burst completed on inactive write buffer")
 			writeBuffers(i).latched := Bool(false)
 		}
 	}
 
-	io.axiBus.awvalid := writeState === s_send_write_addr
-	io.axiBus.awaddr := writeBuffers(activeWriter).address
+	io.axiBus.awvalid := writeStateReg === s_send_write_addr
+	io.axiBus.awaddr := writeBuffers(activeWriterReg).address
 	io.axiBus.awlen := UInt(burstTransferCount - 1)
 	io.axiBus.awsize := UInt(log2Down(burstByteCount))
-	io.axiBus.wvalid := writeState === s_write_burst_active
+	io.axiBus.wvalid := writeStateReg === s_write_burst_active
 
 	// Select the appropriate write data
-	val writeData = writeBuffers(activeWriter).data
+	val writeData = writeBuffers(activeWriterReg).data
 	val writeLanes = convertToVec(writeData, axiDataWidthBits)
-	io.axiBus.wdata := writeLanes(~writeBurstCount)
-	io.axiBus.wlast := (writeBurstCount === UInt(burstTransferCount - 1)) && 
-		(writeState === s_write_burst_active)
-	io.axiBus.bready := writeState === s_write_burst_complete
+	io.axiBus.wdata := writeLanes(~writeBurstCountReg)
+	io.axiBus.wlast := (writeBurstCountReg === UInt(burstTransferCount - 1)) && 
+		(writeStateReg === s_write_burst_active)
+	io.axiBus.bready := writeStateReg === s_write_burst_complete
 	
 	val writeArbiter = Module(new Arbiter(numWritePorts))
-	var writeRequestBitmap = UInt(writeBuffers(0).latched && writeState === s_write_idle)
+	var writeRequestBitmap = UInt(writeBuffers(0).latched && writeStateReg === s_write_idle)
 	for (i <- 1 until numWritePorts)
-		writeRequestBitmap = Cat(writeBuffers(i).latched && writeState === s_write_idle, writeRequestBitmap)
+		writeRequestBitmap = Cat(writeBuffers(i).latched && writeStateReg === s_write_idle, writeRequestBitmap)
 
 	writeArbiter.io.request := writeRequestBitmap
 	writeArbiter.io.enableUpdate := Bool(true)
 
-	switch (writeState) {
+	switch (writeStateReg) {
 		is (s_write_idle) {
 			when (writeArbiter.io.grantOneHot != UInt(0)) {
 				// Choose a master to begin a write transaction
-				activeWriter := OHToUInt(writeArbiter.io.grantOneHot)
-				writeState := s_send_write_addr
+				activeWriterReg := OHToUInt(writeArbiter.io.grantOneHot)
+				writeStateReg := s_send_write_addr
 			}
 		}
 		
 		is (s_send_write_addr) {
 			when (io.axiBus.awvalid) {
-				writeState := s_write_burst_active
-				writeBurstCount := UInt(0)
+				writeStateReg := s_write_burst_active
+				writeBurstCountReg := UInt(0)
 			}
 		}
 		
 		is (s_write_burst_active) {
 			when (io.axiBus.wready) {
-				writeBurstCount := writeBurstCount + UInt(1)
-				when (writeBurstCount === UInt(burstTransferCount - 1)) {
-					writeState := s_read_burst_complete
+				writeBurstCountReg := writeBurstCountReg + UInt(1)
+				when (writeBurstCountReg === UInt(burstTransferCount - 1)) {
+					writeStateReg := s_read_burst_complete
 				}
 			}
 		}
 
 		is (s_write_burst_complete) {
 			when (io.axiBus.bvalid) {
-				writeState := s_write_idle
+				writeStateReg := s_write_idle
 			}
 		}
 	}

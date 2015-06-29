@@ -26,78 +26,73 @@ class AxiSram(dataWidth : Int, size : Int) extends Module {
 	val s_idle :: s_read_burst :: s_write_burst :: s_write_ack :: Nil = Enum(UInt(), 4)
 
 	val memory = Mem(UInt(width = dataWidth), size, seqRead = true)
-	val state = Reg(init = s_idle)
-	val burstAddress = Reg(UInt(width = 32))
-	val burstCount = Reg(UInt(width = 8))
-	val writeLatched = Reg(Bool(), init = Bool(false))
-	val writeAddress = Reg(UInt(width=32))
-	val readLatched = Reg(Bool(), init = Bool(false))
-	val readAddress = Reg(UInt(width=32))
+	val stateReg = Reg(init = s_idle)
+	val burstAddressReg = Reg(UInt(width = 32))
+	val burstCountReg = Reg(UInt(width = 8))
+	val writeLatchedReg = Reg(Bool(), init = Bool(false))
+	val writeAddressReg = Reg(UInt(width=32))
+	val readLatchedReg = Reg(Bool(), init = Bool(false))
+	val readAddressReg = Reg(UInt(width=32))
 
-	io.wready := state === s_write_burst
-	io.bvalid := state === s_write_ack
-	io.rvalid := state === s_read_burst
-	io.rdata := memory(burstAddress)
+	io.wready := stateReg === s_write_burst
+	io.bvalid := stateReg === s_write_ack
+	io.rvalid := stateReg === s_read_burst
+	io.rdata := memory(burstAddressReg)
 
-	io.awready := !writeLatched
+	io.awready := !writeLatchedReg
 	when (io.awready && io.awvalid) {
-		writeLatched := Bool(true)
-		writeAddress := io.awaddr
+		writeLatchedReg := Bool(true)
+		writeAddressReg := io.awaddr
 	}
 	
-	io.arready := !readLatched
+	io.arready := !readLatchedReg
 	when (io.arready && io.arvalid) {
-		readLatched := Bool(true)
-		readAddress := io.awaddr
+		readLatchedReg := Bool(true)
+		readAddressReg := io.awaddr
 	}
 
-	switch (state) {
+	switch (stateReg) {
 		is (s_idle) {
-			when (writeLatched) { 
-				state := s_write_burst
-				burstAddress := io.awaddr(31, 2)
-				burstCount := io.awlen
-				writeLatched := Bool(false)
+			when (writeLatchedReg) { 
+				stateReg := s_write_burst
+				burstAddressReg := io.awaddr(31, 2)
+				burstCountReg := io.awlen
+				writeLatchedReg := Bool(false)
 			}
-			.elsewhen (readLatched) {
-				state := s_read_burst
-				burstAddress := io.araddr(31, 2)
-				burstCount := io.arlen
-				readLatched := Bool(false)
+			.elsewhen (readLatchedReg) {
+				stateReg := s_read_burst
+				burstAddressReg := io.araddr(31, 2)
+				burstCountReg := io.arlen
+				readLatchedReg := Bool(false)
 			}
 		} 
 		is (s_read_burst) {
 			when (io.rready) {
-				when (burstCount === UInt(0)) {
-					state := s_idle
+				when (burstCountReg === UInt(0)) {
+					stateReg := s_idle
 				}
 				.otherwise {
-					burstAddress := burstAddress + UInt(1)
-					burstCount := burstCount - UInt(1)
+					burstAddressReg := burstAddressReg + UInt(1)
+					burstCountReg := burstCountReg - UInt(1)
 				}
 			}
 		} 
 		is (s_write_burst) {
 			when (io.wvalid) {
-				memory(burstAddress) := io.wdata
-				when (burstCount === UInt(0)) {
-					state := s_write_ack
+				memory(burstAddressReg) := io.wdata
+				when (burstCountReg === UInt(0)) {
+					stateReg := s_write_ack
 				}
 				.otherwise {
-					burstAddress := burstAddress + UInt(1)
-					burstCount := burstCount - UInt(1)
+					burstAddressReg := burstAddressReg + UInt(1)
+					burstCountReg := burstCountReg - UInt(1)
 				}
 			}
 		} 
 		is (s_write_ack) {
 			when (io.bready) {
-				state := s_idle
+				stateReg := s_idle
 			}
 		}
 	}
 }
-
-
-
-
-
