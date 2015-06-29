@@ -16,6 +16,10 @@
 
 import Chisel._
 
+//
+// Top level placeholder. This is test code now.
+//
+
 class Top (dataWidth : Int) extends Module {
 	val io = new Bundle {
 		val axiBus = new Axi4Master(dataWidth) 

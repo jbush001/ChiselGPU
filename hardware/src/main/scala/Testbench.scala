@@ -16,6 +16,11 @@
 
 import Chisel._
 
+//
+// Top level simulation testbench, and main function for both simulation and
+// synthesis.
+//
+
 class Testbench extends Module {
 	val io = new Bundle {
 		val halfClock = UInt(OUTPUT)	// Allows seeing clock in waveform

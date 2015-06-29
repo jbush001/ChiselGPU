@@ -18,10 +18,22 @@ import Chisel._
 
 //
 // Tile Buffer
+// This stores rendered depth, stencil, and color information for a small
+// square portion of the framebuffer (a tile).  It performs alpha blending,
+// stencil checks, and depth checks. It has a three stage pipeline and 
+// can accept one pixel per cycle without stalling. When rendering is finished
+// for the tile, the resolveRequest signal will cause this to flush the
+// contents of the color buffer to main memory via the arbiter.
+//
+// Constraints:
 // - The same pixel location cannot be written twice within 1 cycle
 // - Assumes pre-multiplied alpha
 // - 32 bpp output
 // - There must be 3 cycles after the last write before a resolve
+//
+// Open Questions/To do:
+// - How to clear the framebuffer efficiently?  Do it during resolve?
+// - stencil and depth buffers are not implemented yet
 //
 
 class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
