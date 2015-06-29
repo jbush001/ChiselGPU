@@ -22,36 +22,31 @@ import Chisel._
 
 class AxiSram(dataWidth : Int, size : Int) extends Module {
 	val io = new Axi4Master(dataWidth).flip
-	
-	val memory = Mem(UInt(width = 32), size, seqRead = true)
-	
+
 	val s_idle :: s_read_burst :: s_write_burst :: s_write_ack :: Nil = Enum(UInt(), 4)
+
+	val memory = Mem(UInt(width = dataWidth), size, seqRead = true)
 	val state = Reg(init = s_idle)
 	val burstAddress = Reg(UInt(width = 32))
 	val burstCount = Reg(UInt(width = 8))
-	io.wready := state === s_write_burst;
-	io.bvalid := state === s_write_ack;
-
-	val memoryReadValid = Reg(Bool(), init=Bool(false))
-	io.rvalid := memoryReadValid;
-	val memoryReadValue = Reg(UInt(width = 32))
-	memoryReadValue := memory(burstAddress)
-	io.rdata := memoryReadValue
-
-	val writeLatched = Reg(Bool())
+	val writeLatched = Reg(Bool(), init = Bool(false))
 	val writeAddress = Reg(UInt(width=32))
-	val readLatched = Reg(Bool())
+	val readLatched = Reg(Bool(), init = Bool(false))
 	val readAddress = Reg(UInt(width=32))
 
-	io.awready := !writeLatched
-	io.arready := !readLatched
+	io.wready := state === s_write_burst
+	io.bvalid := state === s_write_ack
+	io.rvalid := state === s_read_burst
+	io.rdata := memory(burstAddress)
 
-	when (!writeLatched && io.awvalid) {
+	io.awready := !writeLatched
+	when (io.awready && io.awvalid) {
 		writeLatched := Bool(true)
 		writeAddress := io.awaddr
 	}
 	
-	when (!readLatched && io.arvalid) {
+	io.arready := !readLatched
+	when (io.arready && io.arvalid) {
 		readLatched := Bool(true)
 		readAddress := io.awaddr
 	}
@@ -72,11 +67,9 @@ class AxiSram(dataWidth : Int, size : Int) extends Module {
 			}
 		} 
 		is (s_read_burst) {
-			memoryReadValid := Bool(true)
 			when (io.rready) {
 				when (burstCount === UInt(0)) {
 					state := s_idle
-					memoryReadValid := Bool(false)
 				}
 				.otherwise {
 					burstAddress := burstAddress + UInt(1)
@@ -103,5 +96,8 @@ class AxiSram(dataWidth : Int, size : Int) extends Module {
 		}
 	}
 }
+
+
+
 
 

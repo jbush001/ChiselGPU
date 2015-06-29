@@ -42,7 +42,7 @@ class ArbiterReadPort(burstByteCount : Int) extends Bundle {
 
 class ArbiterWritePort(burstByteCount : Int) extends Bundle {
 	val request = Bool(INPUT)
-	val ack = Bool(OUTPUT) 
+	val ready = Bool(OUTPUT) 
 	val address = UInt(INPUT, 32)
 	val data = UInt(INPUT, burstByteCount * 8)
 
@@ -103,7 +103,7 @@ class BusArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : Int
 		}
 		
 		is (s_send_read_addr) {
-			when (io.axiBus.arvalid) {
+			when (io.axiBus.arready) {
 				readState := s_read_burst_active
 				readBurstCount := UInt(0)
 			}
@@ -113,7 +113,7 @@ class BusArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : Int
 			when (io.axiBus.rvalid) {
 				readLanes(~readBurstCount) := io.axiBus.rdata
 				readBurstCount := readBurstCount + UInt(1)
-				when (readBurstCount === UInt(burstTransferCount - 2)) {
+				when (readBurstCount === UInt(burstTransferCount - 1)) {
 					readState := s_read_burst_complete
 				}
 			}
@@ -131,19 +131,37 @@ class BusArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : Int
 	val writeState = Reg(init = s_write_idle)
 	val activeWriter = Reg(UInt(width = log2Up(numWritePorts)))
 	val writeBurstCount = Reg(UInt(width = log2Up(burstTransferCount)))
-	for (i <- 0 until numWritePorts ) {
-		io.writePorts(i).ack := (writeState === s_write_burst_complete) && 
-			(activeWriter === UInt(i))
+
+	class WriteBuffer extends Bundle {
+		val latched = Bool()
+		val address = UInt(width = 32)
+		val data = UInt(width = burstByteCount * 8)
+
+		override def clone = (new WriteBuffer).asInstanceOf[this.type]
+	}
+
+	val writeBuffers = Vec.fill(numWritePorts) { Reg(new WriteBuffer) }
+	for (i <- 0 until numWritePorts) {
+		io.writePorts(i).ready := !writeBuffers(i).latched
+		when (io.writePorts(i).request && io.writePorts(i).ready) {
+			writeBuffers(i).latched := Bool(true)
+			writeBuffers(i).address := io.writePorts(i).address
+			writeBuffers(i).data := io.writePorts(i).data
+		}
+		.elsewhen (writeState === s_write_burst_complete && activeWriter === UInt(i)) {
+			assert(writeBuffers(i).latched, "Write burst completed on inactive write buffer")
+			writeBuffers(i).latched := Bool(false)
+		}
 	}
 
 	io.axiBus.awvalid := writeState === s_send_write_addr
-	io.axiBus.awaddr := io.writePorts(activeWriter).address
+	io.axiBus.awaddr := writeBuffers(activeWriter).address
 	io.axiBus.awlen := UInt(burstTransferCount - 1)
 	io.axiBus.awsize := UInt(log2Down(burstByteCount))
 	io.axiBus.wvalid := writeState === s_write_burst_active
 
 	// Select the appropriate write data
-	val writeData = io.writePorts(activeWriter).data
+	val writeData = writeBuffers(activeWriter).data
 	val writeLanes = convertToVec(writeData, axiDataWidthBits)
 	io.axiBus.wdata := writeLanes(~writeBurstCount)
 	io.axiBus.wlast := (writeBurstCount === UInt(burstTransferCount - 1)) && 
@@ -151,9 +169,9 @@ class BusArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : Int
 	io.axiBus.bready := writeState === s_write_burst_complete
 	
 	val writeArbiter = Module(new Arbiter(numWritePorts))
-	var writeRequestBitmap = UInt(io.writePorts(0).request && writeState === s_write_idle)
+	var writeRequestBitmap = UInt(writeBuffers(0).latched && writeState === s_write_idle)
 	for (i <- 1 until numWritePorts)
-		writeRequestBitmap = Cat(io.writePorts(i).request && writeState === s_write_idle, writeRequestBitmap)
+		writeRequestBitmap = Cat(writeBuffers(i).latched && writeState === s_write_idle, writeRequestBitmap)
 
 	writeArbiter.io.request := writeRequestBitmap
 	writeArbiter.io.enableUpdate := Bool(true)
@@ -190,8 +208,5 @@ class BusArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : Int
 		}
 	}
 }
-
-
-
 
 

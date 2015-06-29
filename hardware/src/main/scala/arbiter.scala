@@ -34,9 +34,8 @@ class Arbiter(numInputs : Int) extends Module {
 		var isGranted0 = Bool(false)
 		for (priorityIndex <- 0 until numInputs) {
 			var isGranted1 = io.request(grantIndex) & priorityOneHot(priorityIndex)
-			for (bitIndex <- 0 until numInputs - 1) {
+			for (bitIndex <- 0 until numInputs - 1)
 				isGranted1 = isGranted1 & !io.request((priorityIndex + bitIndex + 1) % numInputs)
-			}
 			
 			isGranted0 = isGranted0 | isGranted1
 		}
