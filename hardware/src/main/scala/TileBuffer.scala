@@ -34,6 +34,10 @@ import Chisel._
 // Open Questions/To do:
 // - How to clear the framebuffer efficiently?  Do it during resolve?
 // - stencil and depth buffers are not implemented yet
+// - Use advanced parameterization for tile size and burstByteCount
+// - How does early-Z connect with this module
+// - Should this store and accept 2x2 quads instead of individual pixels?
+// - Hook up enableAlpha
 //
 
 class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
@@ -50,14 +54,35 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 		val pixelX = UInt(INPUT, tileCoordBits)
 		val pixelY = UInt(INPUT, tileCoordBits)
 		val pixelColor = Vec.fill(4)(UInt(INPUT, width = colorChannelBits))
+		
+		val resolveArbPort = new ArbiterWritePort(burstByteCount).flip
 	
 		// Resolve interface. Copy color data back to memory.
-		val resolveRequest = Bool(INPUT)
-		val resolveBaseAddress = UInt(INPUT, 32)
-		val resolveStride = UInt(INPUT, 32)
-		val resolveArbPort = new ArbiterWritePort(burstByteCount).flip
+		val registerUpdate = new RegisterUpdate().flip
 	}
 	
+	// Handle configuration updates from the command processor
+	val resolveBaseAddress = Reg(UInt(INPUT, 32))
+	val resolveStride = Reg(UInt(INPUT, 32))
+	val enableAlpha = Reg(Bool(), init=Bool(false))
+
+	when (io.registerUpdate.update) {
+		switch (io.registerUpdate.address) {
+			is (regids.reg_resolve_base_addr) {
+				resolveBaseAddress := io.registerUpdate.value
+			}
+
+			is (regids.reg_resolve_stride) {
+				resolveStride := io.registerUpdate.value
+			}
+
+			is (regids.reg_enable_alpha) {
+				enableAlpha := io.registerUpdate.value(0)
+			}
+		}
+	}
+	
+	// Pipeline
 	val color_red :: color_green :: color_blue :: color_alpha :: Nil  = Enum(UInt(), 4)
 
 	val colorMemory = Mem(UInt(width = colorBufferBits), tileSize * tileSize,
@@ -126,7 +151,9 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	}
 
 	// 
-	// Resolve logic
+	// Resolve logic. The read port on internal color buffer SRAM is 32 bits, but
+	// the external bus interface is wider. Read individual words, collect into
+	// a larger register, then push this to the bus interface.
 	//
 	val numLanes = burstByteCount / (colorBufferBits / 8)
 	val resolveLaneReg = Reg(UInt(width = log2Up(numLanes)))
@@ -140,10 +167,10 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	
 	switch (resolveStateReg) {
 		is (s_resolve_not_active) {
-			when (io.resolveRequest) {
+			when (io.registerUpdate.update && io.registerUpdate.address === regids.reg_start_resolve) {
 				resolveStateReg := s_resolve_collect_first
 				resolveLaneReg := UInt(0)
-				resolveWriteAddressReg := io.resolveBaseAddress
+				resolveWriteAddressReg := resolveBaseAddress
 				resolveInternalAddrReg := UInt(0)
 			}
 		}
@@ -180,7 +207,7 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 				when (resolveInternalAddrReg(tileCoordBits - 1, 0) === UInt(tileSize * bytesPerPixel - burstByteCount)) {
 					// End of row, skip ahead by stride
 					resolveWriteAddressReg := resolveWriteAddressReg + UInt(burstByteCount) + 
-						io.resolveStride
+						resolveStride
 				}
 				.otherwise {
 					// Next burst in same row

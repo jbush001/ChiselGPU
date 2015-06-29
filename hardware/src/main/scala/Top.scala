@@ -27,13 +27,21 @@ class Top (dataWidth : Int) extends Module {
 
 	val busArbiter = Module(new BusArbiter(2, 2, 32, 32))
 	val tileBuffer = Module(new TileBuffer(64, 32))
+	val commandListProcessor = Module(new CommandListProcessor(32))
 
 	busArbiter.io.axiBus <> io.axiBus
+	busArbiter.io.readPorts(0) <> commandListProcessor.io.arbiterPort
+	busArbiter.io.writePorts(0) <> tileBuffer.io.resolveArbPort
+	commandListProcessor.io.registerUpdate <> tileBuffer.io.registerUpdate
+
 	busArbiter.io.readPorts(1).address := UInt(0)
 	busArbiter.io.readPorts(1).request := Bool(false)
 	busArbiter.io.writePorts(1).request := Bool(false)
 	busArbiter.io.writePorts(1).address := UInt(0)
-	busArbiter.io.writePorts(0) <> tileBuffer.io.resolveArbPort
+
+	//
+	// XXX test code
+	//
 
 	val pixelXReg = Reg(UInt(width = 6), init = UInt(0))
 	var pixelYReg = Reg(UInt(width = 6), init = UInt(0))
@@ -43,9 +51,7 @@ class Top (dataWidth : Int) extends Module {
 
 	tileBuffer.io.pixelX := pixelXReg
 	tileBuffer.io.pixelY := pixelYReg
-	tileBuffer.io.resolveRequest := stateReg === s_start_resolve
-	tileBuffer.io.resolveBaseAddress := UInt(0) 
-	tileBuffer.io.resolveStride := UInt(0)
+	commandListProcessor.io.HACK_resolve := stateReg === s_start_resolve
 
 	tileBuffer.io.pixelValid := stateReg === s_fill
 	tileBuffer.io.pixelColor := Vec.fill(4) { UInt(0xff) }
