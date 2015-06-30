@@ -20,7 +20,7 @@ simulator: FORCE
 	g++ -Os -std=c++11 -o simulator src/main/cpp/simmain.cpp generated_cpp/Testbench.cpp -Igenerated_cpp
 
 run: simulator
-	./simulator
+	./simulator -d memory.bin,0,4000 -c 20000 -w
 	convert -depth 8 -size 64x64 rgba:memory.bin output.png
 
 # Generate verilog sources
