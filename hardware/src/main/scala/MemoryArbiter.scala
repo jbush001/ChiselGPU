@@ -49,7 +49,7 @@ class ArbiterWritePort(burstByteCount : Int) extends Bundle {
 	override def clone = new ArbiterWritePort(burstByteCount).asInstanceOf[this.type]
 }
 
-class BusArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : Int, 
+class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : Int, 
 	burstByteCount : Int) extends Module {
 
 	val io = new Bundle {

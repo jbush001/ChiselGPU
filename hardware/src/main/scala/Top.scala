@@ -25,7 +25,7 @@ class Top (dataWidth : Int) extends Module {
 		val axiBus = new Axi4Master(dataWidth) 
 	}
 
-	val busArbiter = Module(new BusArbiter(2, 2, 32, 32))
+	val busArbiter = Module(new MemoryArbiter(2, 2, 32, 32))
 	val tileBuffer = Module(new TileBuffer(64, 32))
 	val commandListProcessor = Module(new CommandListProcessor(32))
 
