@@ -139,15 +139,16 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	//
 	// Stage 3:
 	// - Blend pixel values, clamp, and writeback
-	// - Writeback new pixel value (if visible)
+	// - Write new pixel value (if visible)
 	//
-	val blendedColor = Vec.tabulate(4)((component) => {
+	val writebackColor = Vec.tabulate(4)((component) => {
 		val sum = oldWeightedColorStage2Reg(component) + newPixelColorStage2Reg(component)
-		Mux(sum < UInt(255), sum, UInt(255))
+		val clamped = Mux(sum < UInt(255), sum, UInt(255))
+		Mux(enableAlpha, clamped, newPixelColorStage2Reg(component))
 	})
 
 	when (updatePixelStage2Reg) {
-		colorMemory(pixelAddressStage2Reg) := blendedColor.toBits
+		colorMemory(pixelAddressStage2Reg) := writebackColor.toBits
 	}
 
 	// 
