@@ -26,6 +26,7 @@ run: simulator
 # Generate verilog sources
 verilog:
 	sbt "run --Wall --backend v --assert --targetDir generated_verilog --noInlineMem"
+	./makesrams.py generated_verilog/Top.conf generated_verilog/altera_memories.v
 
 clean:
 	rm -rf generated_cpp
