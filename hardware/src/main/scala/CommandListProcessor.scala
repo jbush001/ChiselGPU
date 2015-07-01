@@ -30,7 +30,11 @@ class RegisterUpdate extends Bundle {
 }
 
 object regids {
-	val reg_start_resolve :: reg_resolve_base_addr :: reg_resolve_stride :: reg_enable_alpha :: Nil = Enum(UInt(), 4)
+	val (reg_start_resolve :: 
+		reg_resolve_base_addr :: 
+		reg_resolve_stride :: 
+		reg_enable_alpha :: 
+		Nil) = Enum(UInt(), 4)
 }
 
 class CommandListProcessor(burstByteCount : Int) extends Module {

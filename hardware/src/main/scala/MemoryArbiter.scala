@@ -17,7 +17,7 @@
 import Chisel._
 
 //
-// Bus arbiter. Performs the following functions:
+// Memory arbiter. Performs the following functions:
 // - Serializes requests from multiple masters for the external system
 //   memory bus.
 // - Hides external bus protocol behind a simpler request/response

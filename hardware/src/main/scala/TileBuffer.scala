@@ -22,22 +22,22 @@ import Chisel._
 // square portion of the framebuffer (a tile).  It performs alpha blending,
 // stencil checks, and depth checks. It has a three stage pipeline and 
 // can accept one pixel per cycle without stalling. When rendering is finished
-// for the tile, the resolveRequest signal will cause this to flush the
-// contents of the color buffer to main memory via the arbiter.
+// for the tile, writing the reg_start_resolve register will cause this to write
+// the contents of the color buffer to main memory via the arbiter.
 //
 // Constraints:
-// - The same pixel location cannot be written twice within 1 cycle
 // - Assumes pre-multiplied alpha
 // - 32 bpp output
+// - The same pixel location cannot be written twice within 1 cycle
 // - There must be 3 cycles after the last write before a resolve
 //
 // Open Questions/To do:
 // - How to clear the framebuffer efficiently?  Do it during resolve?
-// - stencil and depth buffers are not implemented yet
+// - Stencil and depth buffers are not implemented yet
 // - Use advanced parameterization for tile size and burstByteCount
-// - How does early-Z connect with this module
+//   (https://chisel.eecs.berkeley.edu/2.2.0/chisel-parameters.pdf)
+// - How does early-Z connect with this module?
 // - Should this store and accept 2x2 quads instead of individual pixels?
-// - Hook up enableAlpha
 //
 
 class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
