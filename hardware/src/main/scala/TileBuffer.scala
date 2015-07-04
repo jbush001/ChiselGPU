@@ -40,6 +40,13 @@ import Chisel._
 // - Should this store and accept 2x2 quads instead of individual pixels?
 //
 
+class RGBAColor extends Bundle {
+	val red = UInt(width = 8)
+	val green = UInt(width = 8)
+	val blue = UInt(width = 8)
+	val alpha = UInt(width = 8)
+}
+
 class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	val tileCoordBits = log2Up(tileSize)
 	val colorChannelBits = 8
@@ -53,7 +60,7 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 		val pixelValid = Bool(INPUT)
 		val pixelX = UInt(INPUT, tileCoordBits)
 		val pixelY = UInt(INPUT, tileCoordBits)
-		val pixelColor = Vec.fill(4)(UInt(INPUT, width = colorChannelBits))
+		val pixelColor = (new RGBAColor).asInput
 		
 		val resolveArbPort = new ArbiterWritePort(burstByteCount).flip
 	
@@ -81,12 +88,8 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 			}
 		}
 	}
-	
-	// Pipeline
-	val color_red :: color_green :: color_blue :: color_alpha :: Nil  = Enum(UInt(), 4)
 
-	val colorMemory = Mem(UInt(width = colorBufferBits), tileSize * tileSize,
-		seqRead=true)
+	val colorMemory = Mem(new RGBAColor, tileSize * tileSize, seqRead=true)
 
 	val s_resolve_not_active :: s_resolve_collect_first :: s_resolve_collect_rest :: s_resolve_writeback :: Nil = Enum(UInt(), 4)
 	val resolveStateReg = Reg(init=s_resolve_not_active)
@@ -98,8 +101,8 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	val pixelAddressIn = Cat(io.pixelY, io.pixelX)
 	val pixelAddressStage1Reg = Reg(UInt(width = tileCoordBits * 2))
 	val pixelValidStage1Reg = Reg(Bool())
-	val newPixelColorStage1Reg = Vec.fill(4)(Reg(UInt(colorChannelBits)))
-	val readColorValue = UInt(width = colorBufferBits)
+	val newPixelColorStage1Reg = Reg(new RGBAColor)
+	val readColorValue = new RGBAColor
 	val readAddressReg = Reg(UInt(width = tileCoordBits * 2))
 	
 	when (resolveStateReg === s_resolve_collect_first || resolveStateReg === s_resolve_collect_rest) {
@@ -112,7 +115,7 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	}
 
 	readColorValue := colorMemory(readAddressReg)
-	val oldPixelColorStage1 = Vec.tabulate(4)((i) => readColorValue((i + 1) * 8 - 1, i * 8))
+	val oldPixelColorStage1 = readColorValue
 	pixelValidStage1Reg := io.pixelValid;
 	pixelAddressStage1Reg := pixelAddressIn
 	newPixelColorStage1Reg := io.pixelColor
@@ -122,15 +125,17 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	// - XXX Perform visibility checks (stencil, depth)
 	// - Multiply destination pixel by one minus alpha
 	//
-	val newPixelColorStage2Reg = Vec.fill(4)(Reg(UInt(colorChannelBits)))
+	val newPixelColorStage2Reg = Reg(new RGBAColor)
 	val pixelAddressStage2Reg = Reg(UInt(width = tileCoordBits * 2))
 	val updatePixelStage2Reg = Reg(Bool())
-	val oldWeightedColorStage2Reg = Vec.fill(4)(Reg(UInt(width = colorChannelBits)))
+	val oldWeightedColorStage2Reg = Reg(new RGBAColor)
 
 	pixelAddressStage2Reg := pixelAddressStage1Reg
-	val oneMinusAlpha = UInt(0xff) - newPixelColorStage1Reg(color_alpha)
-	var component = 0
-	oldWeightedColorStage2Reg := oldPixelColorStage1.map(x => (x * oneMinusAlpha)(colorChannelBits * 2 - 1, colorChannelBits))
+	val oneMinusAlpha = UInt(0xff) - newPixelColorStage1Reg.alpha
+	oldWeightedColorStage2Reg.red := (oldPixelColorStage1.red * oneMinusAlpha)(15, 8)
+	oldWeightedColorStage2Reg.green := (oldPixelColorStage1.green * oneMinusAlpha)(15, 8)
+	oldWeightedColorStage2Reg.blue := (oldPixelColorStage1.blue * oneMinusAlpha)(15, 8)
+	oldWeightedColorStage2Reg.alpha := (oldPixelColorStage1.alpha * oneMinusAlpha)(15, 8)
 	newPixelColorStage2Reg := newPixelColorStage1Reg
 
 	// XXX perform depth and stencil checks here
@@ -141,14 +146,17 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	// - Blend pixel values, clamp, and writeback
 	// - Write new pixel value (if visible)
 	//
-	val writebackColor = Vec.tabulate(4)((component) => {
-		val sum = oldWeightedColorStage2Reg(component) + newPixelColorStage2Reg(component)
-		val clamped = Mux(sum < UInt(255), sum, UInt(255))
-		Mux(enableAlpha, clamped, newPixelColorStage2Reg(component))
-	})
-
+	def clamp = (x : UInt) => Mux(x < UInt(255), x, UInt(255))
+	
+	val blendedColor = new RGBAColor
+	blendedColor.red := clamp(oldWeightedColorStage2Reg.red + newPixelColorStage2Reg.red)
+	blendedColor.blue := clamp(oldWeightedColorStage2Reg.blue + newPixelColorStage2Reg.blue)
+	blendedColor.green := clamp(oldWeightedColorStage2Reg.green + newPixelColorStage2Reg.green)
+	blendedColor.alpha := clamp(oldWeightedColorStage2Reg.alpha + newPixelColorStage2Reg.alpha)
+	
+	val writebackColor = Mux(enableAlpha, blendedColor, newPixelColorStage2Reg)
 	when (updatePixelStage2Reg) {
-		colorMemory(pixelAddressStage2Reg) := writebackColor.toBits
+		colorMemory(pixelAddressStage2Reg) := writebackColor
 	}
 
 	// 
@@ -190,7 +198,7 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 				resolveInternalAddrReg := resolveInternalAddrReg + UInt(1)
 			}
 
-			writeDataVec(~resolveLaneReg) := readColorValue
+			writeDataVec(~resolveLaneReg) := readColorValue.toBits
 		}
 		
 		is (s_resolve_writeback) {

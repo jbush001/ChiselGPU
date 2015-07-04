@@ -25,8 +25,10 @@ class Top (dataWidth : Int) extends Module {
 		val axiBus = new Axi4Master(dataWidth) 
 	}
 
+	val tileSize = 64
+
 	val busArbiter = Module(new MemoryArbiter(2, 2, 32, 32))
-	val tileBuffer = Module(new TileBuffer(64, 32))
+	val tileBuffer = Module(new TileBuffer(tileSize, 32))
 	val commandListProcessor = Module(new CommandListProcessor(32))
 
 	busArbiter.io.axiBus <> io.axiBus
@@ -54,7 +56,10 @@ class Top (dataWidth : Int) extends Module {
 	commandListProcessor.io.HACK_resolve := stateReg === s_start_resolve
 
 	tileBuffer.io.pixelValid := stateReg === s_fill
-	tileBuffer.io.pixelColor := Vec.fill(4) { UInt(0xff) }
+	tileBuffer.io.pixelColor.red := UInt(0xff)
+	tileBuffer.io.pixelColor.blue := UInt(0xff)
+	tileBuffer.io.pixelColor.green := UInt(0xff)
+	tileBuffer.io.pixelColor.alpha := UInt(0xff)
 
 	switch (stateReg) {
 		is (s_fill) {
