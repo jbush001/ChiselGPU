@@ -167,12 +167,10 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	val writebackColor = Mux(enableAlpha, blendedColor, newPixelColorStage2Reg)
 
 	// XXX chisel doesn't support per lane writeback selection. Mux in old value instead
-	val writebackMasked = Vec.tabulate(4) { i => Mux(updatePixelStage2Reg(i), writebackColor(i), 
-		oldPixelColorStage2Reg(i)) }
+	val writebackMasked = Vec.tabulate(4) { i => Mux(updatePixelStage2Reg(3 - i), writebackColor(3 - i), 
+		oldPixelColorStage2Reg(3 - i)) }
 	when (updatePixelStage2Reg != UInt(0)) {
 		colorMemory.write(pixelAddressStage2Reg, writebackMasked)
-		print("write to color memory %d,%d %x\n", pixelAddressStage2Reg(9, 5), pixelAddressStage2Reg(4, 0),
-			updatePixelStage2Reg);
 	}
 	
 	// 

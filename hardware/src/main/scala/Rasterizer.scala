@@ -141,10 +141,6 @@ class Rasterizer(tileSize : Int) extends Module {
 
 	io.outputMask := quad.io.coverageMask & Fill(4, pixelValid)	
 
-	when (io.outputMask != UInt(0)) {
-		printf("write quad %d,%d,%x\n", io.outputX, io.outputY, io.outputMask);
-	}
-
 	io.outputX := xPos
 	io.outputY := yPos
 	io.busy := stateReg != s_idle
