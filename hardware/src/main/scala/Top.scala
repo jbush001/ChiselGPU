@@ -55,17 +55,20 @@ class Top (dataWidth : Int) extends Module {
 	tileBuffer.io.pixelY := pixelYReg
 	commandListProcessor.io.HACK_resolve := stateReg === s_start_resolve
 
-	tileBuffer.io.pixelValid := stateReg === s_fill
-	tileBuffer.io.pixelColor.red := UInt(0xff)
-	tileBuffer.io.pixelColor.blue := UInt(0xff)
-	tileBuffer.io.pixelColor.green := UInt(0xff)
-	tileBuffer.io.pixelColor.alpha := UInt(0xff)
+	tileBuffer.io.pixelMask := Mux(stateReg === s_fill, UInt(9), UInt(0))
+	var i = 0;
+	for (i <- 0 until 4) {
+		tileBuffer.io.pixelColors(i).red := UInt(0xff)
+		tileBuffer.io.pixelColors(i).blue := UInt(0xff)
+		tileBuffer.io.pixelColors(i).green := UInt(0xff)
+		tileBuffer.io.pixelColors(i).alpha := UInt(0xff)
+	}
 
 	switch (stateReg) {
 		is (s_fill) {
 			pixelXReg := pixelXReg + UInt(1)
 			pixelYReg := pixelYReg + UInt(1)
-			when (pixelXReg === UInt(32)) {
+			when (pixelXReg === UInt(16)) {
 				stateReg := s_start_resolve
 			}
 		}
