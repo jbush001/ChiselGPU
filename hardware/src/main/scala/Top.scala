@@ -30,6 +30,7 @@ class Top (dataWidth : Int) extends Module {
 	val busArbiter = Module(new MemoryArbiter(2, 2, 32, 32))
 	val tileBuffer = Module(new TileBuffer(tileSize, 32))
 	val commandListProcessor = Module(new CommandListProcessor(32))
+	val rasterizer = Module(new Rasterizer(tileSize / 2))
 
 	busArbiter.io.axiBus <> io.axiBus
 	busArbiter.io.readPorts(0) <> commandListProcessor.io.arbiterPort
@@ -44,33 +45,53 @@ class Top (dataWidth : Int) extends Module {
 	//
 	// XXX test code
 	//
+	val x0 = 5
+	val y0 = 7
+	val x1 = 62
+	val y1 = 61
+	val x2 = 10
+	val y2 = 40
 
-	val pixelXReg = Reg(UInt(width = 6), init = UInt(0))
-	var pixelYReg = Reg(UInt(width = 6), init = UInt(0))
+	val rastXStep = Vec.fill(3){ SInt(1) }
+	val rastYStep = Vec.fill(3){ SInt(-1) }
+	val rastInitialXCoord = UInt(0)	// Should be top most point
+	val rastInitialYCoord = UInt(0)
+	val rastInitialVal0 = SInt(-1)
+	val rastInitialVal1 = SInt(-30)
+	val rastInitialVal2 = SInt(-30)
+	
+	tileBuffer.io.pixelX := rasterizer.io.outputX
+	tileBuffer.io.pixelY := rasterizer.io.outputY
+	tileBuffer.io.pixelMask := rasterizer.io.outputMask
 
-	val s_fill :: s_start_resolve :: s_done :: Nil = Enum(UInt(), 3)
-	val stateReg = Reg(init = s_fill)
+	val s_start_rasterize :: s_wait_rasterize :: s_start_resolve :: s_done :: Nil = Enum(UInt(), 4)
+	val stateReg = Reg(init = s_start_rasterize)
 
-	tileBuffer.io.pixelX := pixelXReg
-	tileBuffer.io.pixelY := pixelYReg
 	commandListProcessor.io.HACK_resolve := stateReg === s_start_resolve
+	rasterizer.io.xStep := rastXStep
+	rasterizer.io.yStep := rastYStep
+	rasterizer.io.initialXCoord := rastInitialXCoord
+	rasterizer.io.initialYCoord := rastInitialYCoord
+	rasterizer.io.start := stateReg === s_start_rasterize
+	rasterizer.io.initialValue(0) := rastInitialVal0
+	rasterizer.io.initialValue(1) := rastInitialVal1
+	rasterizer.io.initialValue(2) := rastInitialVal2
 
-	tileBuffer.io.pixelMask := Mux(stateReg === s_fill, UInt(9), UInt(0))
 	var i = 0;
 	for (i <- 0 until 4) {
 		tileBuffer.io.pixelColors(i).red := UInt(0xff)
-		tileBuffer.io.pixelColors(i).blue := UInt(0xff)
-		tileBuffer.io.pixelColors(i).green := UInt(0xff)
+		tileBuffer.io.pixelColors(i).blue := UInt(0)
+		tileBuffer.io.pixelColors(i).green := UInt(0)
 		tileBuffer.io.pixelColors(i).alpha := UInt(0xff)
 	}
 
 	switch (stateReg) {
-		is (s_fill) {
-			pixelXReg := pixelXReg + UInt(1)
-			pixelYReg := pixelYReg + UInt(1)
-			when (pixelXReg === UInt(16)) {
-				stateReg := s_start_resolve
-			}
+		is (s_start_rasterize) {
+			stateReg := s_wait_rasterize
+		}
+
+		is (s_wait_rasterize) {
+			stateReg := s_start_resolve
 		}
 		
 		is (s_start_resolve) {

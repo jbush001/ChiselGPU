@@ -171,6 +171,8 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 		oldPixelColorStage2Reg(i)) }
 	when (updatePixelStage2Reg != UInt(0)) {
 		colorMemory.write(pixelAddressStage2Reg, writebackMasked)
+		print("write to color memory %d,%d %x\n", pixelAddressStage2Reg(9, 5), pixelAddressStage2Reg(4, 0),
+			updatePixelStage2Reg);
 	}
 	
 	// 
