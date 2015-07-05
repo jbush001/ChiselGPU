@@ -75,8 +75,8 @@ class TriangleFunction extends Module {
 
 	io.inside := edges.map(_.inside).reduceLeft(_ && _)
 }
-	
 
+// Computes coverage for a quad (2x2 chunk of pixels)
 // 0 1
 // 2 3
 class QuadTriangleFunctions extends Module {
@@ -119,134 +119,142 @@ class Rasterizer(tileSize : Int) extends Module {
 		val outputMask = UInt(OUTPUT, 4) 
 	}
 	
-	val (s_idle ::
-		s_initial_scan ::
-		s_scan_right ::
-		s_find_right_edge ::
-		s_scan_left ::
-		s_find_left_edge :: Nil) = Enum(UInt(), 6)
-
-	val stateReg = Reg(UInt(), init = s_idle)
 	val xPos = Reg(UInt(width = 16))
 	val yPos = Reg(UInt(width = 16))
 	val pixelValid = Reg(Bool(), init = Bool(false))
 	val stepDir = UInt(width = 2)
+	val rasterizationActive = Reg(Bool(), init = Bool(false))
 
 	val quad = Module(new QuadTriangleFunctions)
 	quad.io.stepControl.xStep := io.xStep
 	quad.io.stepControl.yStep := io.yStep
 	quad.io.stepControl.stepDir := stepDir
-	quad.io.setEdgeValue := io.start && stateReg === s_idle
+	quad.io.setEdgeValue := io.start && !rasterizationActive
 	quad.io.newEdgeValue := io.initialValue
 
-	io.outputMask := quad.io.coverageMask & Fill(4, pixelValid)	
+	io.outputMask := quad.io.coverageMask & Fill(4, pixelValid && rasterizationActive)	
 
 	io.outputX := xPos
 	io.outputY := yPos
-	io.busy := stateReg != s_idle
+	io.busy := rasterizationActive
 
-	stepDir := StepDir.step_none
-	
-	switch (stepDir) {
-		is (StepDir.step_left) {
-			xPos := xPos - UInt(1)
-		}
+	val stateWidth = 3
+
+	def romEntry(stepDir : UInt, pixelValid : Boolean, nextState : Int) : UInt = Cat(stepDir, 
+		Bool(pixelValid), UInt(nextState, width = stateWidth))
+  
+	val notReachable = romEntry(StepDir.step_none, false, 0)
+	val rasterizeFinished = romEntry(StepDir.step_none, false, 0)
+  
+	// Scan control microcode. Each entry controls which direction to step, whether
+	// pixels should be emitted (this is used to avoid emitting pixels twice
+	// when searching for an edge), and the next state.
+	// There are four transition entries for each state:
+	// 0: Outside triangle (coverage mask 0)
+	// 1: Inside triangle (coverage mask not 0)
+	// 2: On left edge of tile
+	// 3: On right edge of tile
+	// step_none indicates rasterization is finished
+	val stateTransitionTable = Vec(
+		// 0: Scan right to find left edge of triangle
+		romEntry(StepDir.step_right, false, 0),	// Keep searching right 
+		romEntry(StepDir.step_right, true, 1), 	// Start emitting right
+		romEntry(StepDir.step_right, true, 0),	// Start searching right (only happens on start)
+		romEntry(StepDir.step_none, false, 0),	// End of triangle 
+
+		// 1: Sweep right over inside of triangle
+		romEntry(StepDir.step_down, false, 2), 	// hit edge, next line
+		romEntry(StepDir.step_right, true, 1), 	// Inside, keep sweeping
+		romEntry(StepDir.step_right, true, 1),  // Left edge of tile, keep scanning 
+		romEntry(StepDir.step_down, true, 5), 	// Skip directly to scanning if we hit edge
+
+		// 2: Stepped down, determine where to go next
+		romEntry(StepDir.step_left, false, 3), 	// I'm outside, find edge
+		romEntry(StepDir.step_right, false, 4), // I'm inside, find edge
+		notReachable,
+		notReachable,
 		
-		is (StepDir.step_down) {
-			yPos := yPos + UInt(1)
-		}
-		
-		is (StepDir.step_right) {
-			xPos := xPos + UInt(1)
-		}
+		// 3: Outside triangle after down. Search left to find right edge
+		romEntry(StepDir.step_left, false, 3),  // Keep searching
+		romEntry(StepDir.step_left, true, 5), 	// Found edge, emit pixel and goto left sweep
+		rasterizeFinished, 
+		notReachable,	
+
+		// 4: Inside triangle after down. Scan right to find right edge
+		romEntry(StepDir.step_left, false, 5),	// Found edge. Step back into triangle, sweep
+		romEntry(StepDir.step_right, false, 4), // keep looking
+		notReachable,
+		romEntry(StepDir.step_left, true, 5), 	// Hit tile edge, emit pixel, keep sweeping
+
+		// 5: Left sweep
+		romEntry(StepDir.step_down, false, 6), 	// End of sweep
+		romEntry(StepDir.step_left, true, 5),	// Keep scanning 
+		romEntry(StepDir.step_down, true, 1), 	// Hit edge, emit pixel, sweep right
+		romEntry(StepDir.step_left, true, 5),	// Right edge of tile, keep sweeping
+
+		// 6: Stepped down, determine where to go next
+		romEntry(StepDir.step_right, false, 0), // Outside, find edge
+		romEntry(StepDir.step_left, false, 7), 	// Inside, find edge
+		notReachable,
+		notReachable,
+
+		// 7: Inside triangle after down. Scan left to find left edge
+		romEntry(StepDir.step_left, false, 7), 	// Keep searching
+		romEntry(StepDir.step_right, true, 1),	// Found triangle edge, step back into triangle 
+		romEntry(StepDir.step_right, true, 0),	// Hit tile edge, start scanning right 
+		romEntry(StepDir.step_left, false, 7)	// Stay in this state
+	)
+
+	// Scan control microsequencer
+	val stateReg = Reg(UInt(width = stateWidth), init = UInt(0))
+	val cond = UInt(width = 2)
+	when (xPos === UInt(0)) {
+		cond := UInt(2)	// Left edge
+	} 
+	.elsewhen (xPos === UInt(tileSize - 1)) {
+		cond := UInt(3)	// Right edge
+	}
+	.elsewhen (quad.io.coverageMask === UInt(0)) {
+		cond := UInt(0)	// Outside triangle
+	}
+	.otherwise {
+		cond := UInt(1)	// Inside triangle
 	}
 	
-	switch (stateReg) {
-		is (s_idle) {
-			when (io.start) {
-				stateReg := s_initial_scan
-				xPos := io.initialXCoord
-				yPos := io.initialYCoord
+	val stateTableEntry = stateTransitionTable(Cat(stateReg, cond))
+	stepDir := stateTableEntry(5, 4)
+	pixelValid := stateTableEntry(3)
+
+	when (rasterizationActive) {
+		when (stepDir === StepDir.step_none || (stepDir === StepDir.step_down 
+			&& yPos === UInt(tileSize - 1))) {
+			printf("stop rasterization state %d event %d\n", stateReg, cond);
+			rasterizationActive := Bool(false)
+		}
+		.otherwise {
+			printf("rasterize state %d event %d x %d y %d\n", stateReg, cond, xPos, yPos);
+			stateReg := stateTableEntry(2, 0)
+		}
+
+		switch (stepDir) {
+			is (StepDir.step_left) {
+				xPos := xPos - UInt(1)
+			}
+	
+			is (StepDir.step_down) {
+				yPos := yPos + UInt(1)
+			}
+	
+			is (StepDir.step_right) {
+				xPos := xPos + UInt(1)
 			}
 		}
-		
-		is (s_initial_scan) {
-			when (quad.io.coverageMask != UInt(0)) {
-				// Found a pixel
-				stateReg := s_scan_right
-				pixelValid := Bool(true)
-			}
-			.elsewhen (xPos === UInt(tileSize)) {
-				// Couldn't find first pixel, give up
-				stateReg := s_idle
-				pixelValid := Bool(false)
-			}
-			.otherwise {
-				// Walk right looking for left edge
-				stepDir := StepDir.step_right
-			}
-		}
-		
-		is (s_scan_right) {
-			when (xPos === UInt(tileSize)) {
-				// Hit edge, step down
-				stepDir := StepDir.step_down
-				stateReg := s_scan_left
-				pixelValid := Bool(false)
-			}
-			.elsewhen (quad.io.coverageMask != UInt(0)) {
-				// Step to the right
-				stepDir := StepDir.step_right
-			}
-			.otherwise {
-				// Right edge of triangle, step down
-				stateReg := s_find_right_edge
-				stepDir := StepDir.step_down
-				pixelValid := Bool(false)
-			}
-		}
-		
-		is (s_find_right_edge) {
-			when (quad.io.coverageMask != UInt(0) && xPos != UInt(tileSize)) {
-				// Walk to the right until we are past the edge
-				stepDir := StepDir.step_right
-			}
-			.otherwise {
-				// Begin stepping backward
-				// XXX this will fail if the left is not visible
-				stateReg := s_scan_left
-				stepDir := StepDir.step_left
-				pixelValid := Bool(true)
-			}
-		}
-		
-		is (s_scan_left) {
-			when (quad.io.coverageMask != UInt(0) && xPos != UInt(0)) {
-				// Step left, filling pixels
-				stepDir := StepDir.step_left
-			}
-			.elsewhen (yPos === UInt(tileSize - 1)) {
-				// Needed to step down, but at the bottom of tile
-				stateReg := s_idle
-				pixelValid := Bool(false)
-			} .otherwise {
-				// Step to next line
-				stateReg := s_find_left_edge
-				pixelValid := Bool(false)
-				stepDir := StepDir.step_down
-			}
-		}
-		
-		is (s_find_left_edge) {
-			when (quad.io.coverageMask != UInt(0) && xPos != UInt(0)) {
-				stepDir := StepDir.step_left
-			}
-			.otherwise {
-				stepDir := StepDir.step_right
-				stateReg := s_scan_right
-				pixelValid := Bool(true)
-			}
-		}
+	}
+	.elsewhen (io.start) {
+		// Start rasterizing
+		stateReg := UInt(0)
+		xPos := io.initialXCoord
+		yPos := io.initialYCoord
+		rasterizationActive := Bool(true)
 	}
 }
-

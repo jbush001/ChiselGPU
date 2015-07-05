@@ -45,20 +45,13 @@ class Top (dataWidth : Int) extends Module {
 	//
 	// XXX test code
 	//
-	val x0 = 5
-	val y0 = 7
-	val x1 = 62
-	val y1 = 61
-	val x2 = 10
-	val y2 = 40
-
-	val rastXStep = Vec.fill(3){ SInt(1) }
-	val rastYStep = Vec.fill(3){ SInt(-1) }
-	val rastInitialXCoord = UInt(0)	// Should be top most point
-	val rastInitialYCoord = UInt(0)
-	val rastInitialVal0 = SInt(-1)
-	val rastInitialVal1 = SInt(-30)
-	val rastInitialVal2 = SInt(-30)
+	val rastXStep = Vec(SInt(1), SInt(-1), SInt(0))
+	val rastYStep = Vec(SInt(-1), SInt(-1), SInt(1))
+	val rastInitialXCoord = UInt(0)	
+	val rastInitialYCoord = UInt(8)
+	val rastInitialVal0 = SInt(-17)
+	val rastInitialVal1 = SInt(14)
+	val rastInitialVal2 = SInt(-16)
 	
 	tileBuffer.io.pixelX := rasterizer.io.outputX
 	tileBuffer.io.pixelY := rasterizer.io.outputY
