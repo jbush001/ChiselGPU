@@ -70,7 +70,6 @@ class Top (dataWidth : Int) extends Module {
 	rasterizer.io.initialValue(1) := rastInitialVal1
 	rasterizer.io.initialValue(2) := rastInitialVal2
 
-	var i = 0;
 	for (i <- 0 until 4) {
 		tileBuffer.io.pixelColors(i).red := UInt(0xff)
 		tileBuffer.io.pixelColors(i).blue := UInt(0)

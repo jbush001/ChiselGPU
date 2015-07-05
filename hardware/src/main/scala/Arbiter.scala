@@ -32,9 +32,6 @@ class Arbiter(numInputs : Int) extends Module {
 
 	var priorityOneHotReg = Reg(UInt(width = numInputs), init=UInt(1))
 
-	var grantIndex = 0
-	var priorityIndex = 0
-	var bitIndex = 0
 	var grantOneHot = UInt(0)
 	for (grantIndex <- 0 until numInputs) {
 		var isGranted0 = Bool(false)

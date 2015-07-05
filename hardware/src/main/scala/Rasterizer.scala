@@ -66,7 +66,6 @@ class TriangleFunction extends Module {
 	}
 
 	val edges = Vec.tabulate(3)(i => Module(new EdgeFunction(i)).io)
-	var i = 0
 	for (i <- 0 until 3) {
 		edges(i).stepControl := io.stepControl
 		edges(i).setEdgeValue := io.setEdgeValue
@@ -88,7 +87,6 @@ class QuadTriangleFunctions extends Module {
 	}
 
 	val pixels = Vec.fill(4){ Module(new TriangleFunction()).io }
-	var i = 0
 	for (i <- 0 until 4) {
 		pixels(i).stepControl := io.stepControl
 		pixels(i).setEdgeValue := io.setEdgeValue

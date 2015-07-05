@@ -72,7 +72,6 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 	val activeReaderReg = Reg(UInt(width = log2Up(numReadPorts)))
 	val readBurstCountReg = Reg(UInt(width = log2Up(burstTransferCount)))
 
-	var i = 0
 	for (i <- 0 until numReadPorts ) {
 		io.readPorts(i).data := readDataReg
 		io.readPorts(i).ack := (readStateReg === s_read_burst_complete) && 
