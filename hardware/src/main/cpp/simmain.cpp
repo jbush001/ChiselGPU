@@ -68,7 +68,7 @@ int main (int argc, char* argv[])
 	bool enableMemoryDump = false;
 	uint32_t memDumpBase = 0;
 	size_t memDumpLength = 0;
-	int totalCycles = 20000;
+	int maxCycles = 20000;
 	char memDumpFilename[256];
 	
 	while ((c = getopt(argc, argv, "wd:c:")) != -1)
@@ -109,7 +109,7 @@ int main (int argc, char* argv[])
 			}
 		
 			case 'c':
-				totalCycles = atoi(optarg);
+				maxCycles = atoi(optarg);
 				break;
 
 			case '?':
@@ -146,7 +146,8 @@ int main (int argc, char* argv[])
 	if (enableWaveform)
 		module->mod_t::dump();	// Write initial waveform values
 
-	for (int cycle = 0; cycle < totalCycles; cycle++)
+	int totalCycles;
+	for (totalCycles = 0; totalCycles < maxCycles && !module->Testbench__io_halt.values[0]; totalCycles++)
 	{
 		module->clock_lo(dat_t<1>(0));
 		module->clock_hi(dat_t<1>(0));
@@ -154,7 +155,8 @@ int main (int argc, char* argv[])
 		if (enableWaveform)
 			module->mod_t::dump();	// Write waveform file updates
 	}
-
+	
+	printf("ran for %d cycles\n", totalCycles);
 	if (waveformFile)
 		fclose(waveformFile);
 

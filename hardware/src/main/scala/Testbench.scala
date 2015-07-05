@@ -24,11 +24,13 @@ import Chisel._
 class Testbench extends Module {
 	val io = new Bundle {
 		val halfClock = UInt(OUTPUT)	// Allows seeing clock in waveform
+		val halt = Bool(OUTPUT)
 	}
 
 	val top = Module(new Top(32))
 	val systemMemory = Module(new AxiSram(32, 64 * 64))
 	top.io.axiBus <> systemMemory.io
+	io.halt := top.io.halt
 
 	val DEBUG_halfClockReg = Reg(Bool())
 	DEBUG_halfClockReg := !DEBUG_halfClockReg

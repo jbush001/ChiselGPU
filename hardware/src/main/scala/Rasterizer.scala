@@ -226,11 +226,9 @@ class Rasterizer(tileSize : Int) extends Module {
 	when (rasterizationActive) {
 		when (stepDir === StepDir.step_none || (stepDir === StepDir.step_down 
 			&& yPos === UInt(tileSize - 1))) {
-			printf("stop rasterization state %d event %d\n", stateReg, cond);
 			rasterizationActive := Bool(false)
 		}
 		.otherwise {
-			printf("rasterize state %d event %d x %d y %d\n", stateReg, cond, xPos, yPos);
 			stateReg := stateTableEntry(2, 0)
 		}
 

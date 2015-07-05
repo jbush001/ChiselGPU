@@ -23,6 +23,7 @@ import Chisel._
 class Top (dataWidth : Int) extends Module {
 	val io = new Bundle {
 		val axiBus = new Axi4Master(dataWidth) 
+		val halt = Bool(OUTPUT)
 	}
 
 	val tileSize = 64
@@ -57,7 +58,7 @@ class Top (dataWidth : Int) extends Module {
 	tileBuffer.io.pixelY := rasterizer.io.outputY
 	tileBuffer.io.pixelMask := rasterizer.io.outputMask
 
-	val s_start_rasterize :: s_wait_rasterize :: s_start_resolve :: s_done :: Nil = Enum(UInt(), 4)
+	val s_start_rasterize :: s_wait_rasterize :: s_start_resolve :: s_wait_resolve :: s_done :: Nil = Enum(UInt(), 5)
 	val stateReg = Reg(init = s_start_rasterize)
 
 	commandListProcessor.io.HACK_resolve := stateReg === s_start_resolve
@@ -76,18 +77,32 @@ class Top (dataWidth : Int) extends Module {
 		tileBuffer.io.pixelColors(i).green := UInt(0)
 		tileBuffer.io.pixelColors(i).alpha := UInt(0xff)
 	}
+	
+	io.halt := stateReg === s_done
 
 	switch (stateReg) {
 		is (s_start_rasterize) {
-			stateReg := s_wait_rasterize
+			when (rasterizer.io.busy) {
+				stateReg := s_wait_rasterize
+			}
 		}
 
 		is (s_wait_rasterize) {
-			stateReg := s_start_resolve
+			when (!rasterizer.io.busy) {
+				stateReg := s_start_resolve
+			}
 		}
 		
 		is (s_start_resolve) {
-			stateReg := s_done
+			when (tileBuffer.io.resolveActive) {
+				stateReg := s_wait_resolve
+			}
+		}
+		
+		is (s_wait_resolve) {
+			when (!tileBuffer.io.resolveActive) {
+				stateReg := s_done
+			}
 		}
 	}
 }

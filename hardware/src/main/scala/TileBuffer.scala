@@ -64,6 +64,7 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 		val pixelColors = Vec.fill(4){ (new RGBAColor).asInput }
 		val resolveArbPort = new ArbiterWritePort(burstByteCount).flip
 		val registerUpdate = new RegisterUpdate().flip
+		val resolveActive = Bool(OUTPUT)
 	}
 	
 	// Handle configuration updates from the command processor
@@ -187,6 +188,7 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	resolveInternalAddr := Cat(resolveYCoordReg(tileCoordBits, 1), resolveXQuadReg)
 	io.resolveArbPort.request := resolveStateReg === s_resolve_writeback
 	io.resolveArbPort.address := resolveWriteAddressReg
+	io.resolveActive := resolveStateReg != s_resolve_not_active
 	
 	switch (resolveStateReg) {
 		is (s_resolve_not_active) {
@@ -226,7 +228,7 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 		is (s_resolve_writeback) {
 			// Write data to the bus arbiter
 			when (io.resolveArbPort.ready) {
-				when (resolveYCoordReg === UInt(tileSize) && resolveXQuadReg === UInt(0)) {
+				when (resolveYCoordReg === UInt(tileSize - 1) && resolveXQuadReg === UInt(0)) {
 					// Tile is finished
 					resolveStateReg := s_resolve_not_active
 				}
