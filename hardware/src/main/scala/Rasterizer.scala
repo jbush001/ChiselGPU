@@ -26,15 +26,11 @@ object StepDir {
 // (SIGGRAPH 88), Figure 4. It outputs 2x2 aligned quads with coverage masks.
 //
 
-class StepControl extends Bundle {
-	val xStep = Vec.fill(3)(SInt(INPUT, 32))
-	val yStep = Vec.fill(3)(SInt(INPUT, 32))
-	val stepDir = UInt(INPUT, 2)
-}
-
-class EdgeFunction(edgeIndex : Int) extends Module {
+class EdgeFunction extends Module {
 	val io = new Bundle {
-		val stepControl = new StepControl
+    val stepDir = UInt(INPUT, 2)
+    val xStep = SInt(INPUT, 32)
+    val yStep = SInt(INPUT, 32)
 		val setEdgeValue = Bool(INPUT)
 		val newEdgeValue = SInt(INPUT, 32)
 		val inside = Bool(OUTPUT)
@@ -44,14 +40,14 @@ class EdgeFunction(edgeIndex : Int) extends Module {
 	when (io.setEdgeValue) {
 		edgeValue := io.newEdgeValue
 	}
-	.elsewhen (io.stepControl.stepDir === StepDir.step_down) {
-		edgeValue := edgeValue + io.stepControl.yStep(edgeIndex)
+	.elsewhen (io.stepDir === StepDir.step_down) {
+		edgeValue := edgeValue + io.yStep
 	} 
-	.elsewhen (io.stepControl.stepDir === StepDir.step_left) {
-		edgeValue := edgeValue - io.stepControl.xStep(edgeIndex)
+	.elsewhen (io.stepDir === StepDir.step_left) {
+		edgeValue := edgeValue - io.xStep
 	}
-	.elsewhen(io.stepControl.stepDir === StepDir.step_right) {
-		edgeValue := edgeValue + io.stepControl.xStep(edgeIndex)
+	.elsewhen(io.stepDir === StepDir.step_right) {
+		edgeValue := edgeValue + io.xStep
 	}
 
 	io.inside := edgeValue(31)
@@ -59,15 +55,19 @@ class EdgeFunction(edgeIndex : Int) extends Module {
 
 class TriangleFunction extends Module {
 	val io = new Bundle {
-		val stepControl = new StepControl
+    val xStep = Vec.fill(3)(SInt(INPUT, 32))
+    val yStep = Vec.fill(3)(SInt(INPUT, 32))
+    val stepDir = UInt(INPUT, 2)
 		val setEdgeValue = Bool(INPUT)
 		val newEdgeValue = Vec.fill(3)(SInt(INPUT, 32))
 		val inside = Bool(OUTPUT)
 	}
 
-	val edges = Vec.tabulate(3)(i => Module(new EdgeFunction(i)).io)
+	val edges = Vec.tabulate(3)(i => Module(new EdgeFunction).io)
 	for (i <- 0 until 3) {
-		edges(i).stepControl := io.stepControl
+		edges(i).stepDir := io.stepDir
+    edges(i).xStep := io.xStep(i)
+    edges(i).yStep := io.yStep(i)
 		edges(i).setEdgeValue := io.setEdgeValue
 		edges(i).newEdgeValue := io.newEdgeValue(i)
 	}
@@ -80,7 +80,9 @@ class TriangleFunction extends Module {
 // 2 3
 class QuadTriangleFunctions extends Module {
 	val io = new Bundle {
-		val stepControl = new StepControl
+    val xStep = Vec.fill(3)(SInt(INPUT, 32))
+    val yStep = Vec.fill(3)(SInt(INPUT, 32))
+    val stepDir = UInt(INPUT, 2)
 		val setEdgeValue = Bool(INPUT)
 		val newEdgeValue = Vec.fill(3)(SInt(INPUT, 32))
 		val coverageMask = UInt(OUTPUT, 4)
@@ -88,7 +90,9 @@ class QuadTriangleFunctions extends Module {
 
 	val pixels = Vec.fill(4){ Module(new TriangleFunction()).io }
 	for (i <- 0 until 4) {
-		pixels(i).stepControl := io.stepControl
+		pixels(i).xStep := io.xStep
+		pixels(i).yStep := io.yStep
+    pixels(i).stepDir := io.stepDir
 		pixels(i).setEdgeValue := io.setEdgeValue
 	}
 
@@ -96,10 +100,10 @@ class QuadTriangleFunctions extends Module {
 	
 	for (i <- 0 until 3) {
 		pixels(0).newEdgeValue(i) := io.newEdgeValue(i)
-		pixels(1).newEdgeValue(i) := io.newEdgeValue(i) + io.stepControl.xStep(i)
-		pixels(2).newEdgeValue(i) := io.newEdgeValue(i) + io.stepControl.yStep(i)
-		pixels(3).newEdgeValue(i) := io.newEdgeValue(i) + io.stepControl.xStep(i) + 
-			io.stepControl.yStep(i)
+		pixels(1).newEdgeValue(i) := io.newEdgeValue(i) + io.xStep(i)
+		pixels(2).newEdgeValue(i) := io.newEdgeValue(i) + io.yStep(i)
+		pixels(3).newEdgeValue(i) := io.newEdgeValue(i) + io.xStep(i) + 
+			io.yStep(i)
 	}
 }
 
@@ -124,9 +128,9 @@ class Rasterizer(tileSize : Int) extends Module {
 	val rasterizationActive = Reg(Bool(), init = Bool(false))
 
 	val quad = Module(new QuadTriangleFunctions)
-	quad.io.stepControl.xStep := io.xStep
-	quad.io.stepControl.yStep := io.yStep
-	quad.io.stepControl.stepDir := stepDir
+	quad.io.xStep := io.xStep
+	quad.io.yStep := io.yStep
+	quad.io.stepDir := stepDir
 	quad.io.setEdgeValue := io.start && !rasterizationActive
 	quad.io.newEdgeValue := io.initialValue
 
