@@ -28,9 +28,9 @@ object StepDir {
 
 class EdgeFunction extends Module {
 	val io = new Bundle {
-    val stepDir = UInt(INPUT, 2)
-    val xStep = SInt(INPUT, 32)
-    val yStep = SInt(INPUT, 32)
+		val stepDir = UInt(INPUT, 2)
+		val xStep = SInt(INPUT, 32)
+		val yStep = SInt(INPUT, 32)
 		val setEdgeValue = Bool(INPUT)
 		val newEdgeValue = SInt(INPUT, 32)
 		val inside = Bool(OUTPUT)
@@ -55,9 +55,9 @@ class EdgeFunction extends Module {
 
 class TriangleFunction extends Module {
 	val io = new Bundle {
-    val xStep = Vec.fill(3)(SInt(INPUT, 32))
-    val yStep = Vec.fill(3)(SInt(INPUT, 32))
-    val stepDir = UInt(INPUT, 2)
+		val xStep = Vec.fill(3)(SInt(INPUT, 32))
+		val yStep = Vec.fill(3)(SInt(INPUT, 32))
+		val stepDir = UInt(INPUT, 2)
 		val setEdgeValue = Bool(INPUT)
 		val newEdgeValue = Vec.fill(3)(SInt(INPUT, 32))
 		val inside = Bool(OUTPUT)
@@ -66,8 +66,8 @@ class TriangleFunction extends Module {
 	val edges = Vec.tabulate(3)(i => Module(new EdgeFunction).io)
 	for (i <- 0 until 3) {
 		edges(i).stepDir := io.stepDir
-    edges(i).xStep := io.xStep(i)
-    edges(i).yStep := io.yStep(i)
+		edges(i).xStep := io.xStep(i)
+		edges(i).yStep := io.yStep(i)
 		edges(i).setEdgeValue := io.setEdgeValue
 		edges(i).newEdgeValue := io.newEdgeValue(i)
 	}
@@ -80,9 +80,9 @@ class TriangleFunction extends Module {
 // 2 3
 class QuadTriangleFunctions extends Module {
 	val io = new Bundle {
-    val xStep = Vec.fill(3)(SInt(INPUT, 32))
-    val yStep = Vec.fill(3)(SInt(INPUT, 32))
-    val stepDir = UInt(INPUT, 2)
+		val xStep = Vec.fill(3)(SInt(INPUT, 32))
+		val yStep = Vec.fill(3)(SInt(INPUT, 32))
+		val stepDir = UInt(INPUT, 2)
 		val setEdgeValue = Bool(INPUT)
 		val newEdgeValue = Vec.fill(3)(SInt(INPUT, 32))
 		val coverageMask = UInt(OUTPUT, 4)
@@ -92,7 +92,7 @@ class QuadTriangleFunctions extends Module {
 	for (i <- 0 until 4) {
 		pixels(i).xStep := io.xStep
 		pixels(i).yStep := io.yStep
-    pixels(i).stepDir := io.stepDir
+		pixels(i).stepDir := io.stepDir
 		pixels(i).setEdgeValue := io.setEdgeValue
 	}
 
