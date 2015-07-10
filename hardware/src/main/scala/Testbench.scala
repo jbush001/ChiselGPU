@@ -39,12 +39,12 @@ class Testbench extends Module {
 
 object main {
 	def main(args: Array[String]): Unit = {
-		if (args.contains("v")) {
-			// For synthesis, generate only 'Top' module
-			chiselMain(args, () => Module(new Top(32)))
-		} else {
-			// For simulation, create Testbench wrapper
-			chiselMain(args, () => Module(new Testbench()))
+		val chiselMainArgs = args.slice(1, args.length)
+		args(0) match {
+			case "verilog" => chiselMain(chiselMainArgs, () => Module(new Top(32)))
+			case "simulation" => chiselMain(chiselMainArgs, () => Module(new Testbench()))
+			case "AxiSram" => chiselMainTest(chiselMainArgs, () => Module(new AxiSram(32, 1024))) {
+				c => new AxiSramTest(c)}
 		}
 	}
 }

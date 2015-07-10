@@ -16,7 +16,7 @@
 
 # Generate C++ simulator
 simulator: FORCE
-	sbt "run --Wall --backend c --debug --assert --vcd --targetDir generated_cpp"
+	sbt "run simulation --Wall --backend c --debug --assert --vcd --targetDir generated_cpp"
 	g++ -Os -std=c++11 -o simulator src/main/cpp/simmain.cpp generated_cpp/Testbench.cpp -Igenerated_cpp
 
 run: simulator
@@ -25,8 +25,12 @@ run: simulator
 
 # Generate verilog sources
 verilog:
-	sbt "run --Wall --backend v --assert --targetDir generated_verilog --noInlineMem"
+	sbt "run verilog --Wall --backend v --assert --targetDir generated_verilog --noInlineMem"
 	./makesrams.py generated_verilog/Top.conf generated_verilog/altera_memories.v
+
+# Unit tests
+axisram:
+	sbt "run AxiSram --Wall --backend c --debug --assert --vcd --targetDir generated_cpp --genHarness --compile --test"
 
 clean:
 	rm -rf generated_cpp
