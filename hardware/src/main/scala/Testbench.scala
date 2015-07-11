@@ -45,6 +45,8 @@ object main {
 			case "simulation" => chiselMain(chiselMainArgs, () => Module(new Testbench()))
 			case "AxiSram" => chiselMainTest(chiselMainArgs, () => Module(new AxiSram(32, 1024))) {
 				c => new AxiSramTest(c)}
+			case "Arbiter" => chiselMainTest(chiselMainArgs, () => Module(new Arbiter(4))) {
+				c => new ArbiterTest(c)}
 		}
 	}
 }

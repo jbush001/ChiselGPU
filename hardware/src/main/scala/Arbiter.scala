@@ -37,9 +37,12 @@ class Arbiter(numInputs : Int) extends Module {
 		var isGranted0 = Bool(false)
 		for (priorityIndex <- 0 until numInputs) {
 			var isGranted1 = io.request(grantIndex) & priorityOneHotReg(priorityIndex)
-			for (bitIndex <- 0 until numInputs - 1)
-				isGranted1 = isGranted1 & !io.request((priorityIndex + bitIndex + 1) % numInputs)
-			
+			var bitIndex = priorityIndex
+			while (bitIndex != grantIndex) {
+				isGranted1 = isGranted1 & !io.request(bitIndex)
+				bitIndex = (bitIndex + 1) % numInputs
+			}
+
 			isGranted0 = isGranted0 | isGranted1
 		}
 		
@@ -51,10 +54,53 @@ class Arbiter(numInputs : Int) extends Module {
 	
 	io.grantOneHot := grantOneHot
 	
+	// Rotate left
 	when (io.enableUpdate && io.request != UInt(0)) {
 		if (numInputs > 2)
-			priorityOneHotReg := Cat(priorityOneHotReg(numInputs - 2, 1), priorityOneHotReg(numInputs - 1))
+			priorityOneHotReg := Cat(io.grantOneHot(numInputs - 2, 0), io.grantOneHot(numInputs - 1))
 		else
-			priorityOneHotReg := ~priorityOneHotReg
+			priorityOneHotReg := ~io.grantOneHot	// One bit priority
 	}
 }
+
+// Top level testbench configures with four inputs
+class ArbiterTest(c : Arbiter) extends Tester(c) {
+	poke(c.io.enableUpdate, 1)
+
+	// All inputs requesting
+	poke(c.io.request, 15)
+	step(1)
+	expect(c.io.grantOneHot, 2)
+	step(1)
+	expect(c.io.grantOneHot, 4)
+	step(1)
+	expect(c.io.grantOneHot, 8)
+	step(1)
+	expect(c.io.grantOneHot, 1)
+
+	// Only input 3
+	poke(c.io.request, 8)
+	step(1)
+	expect(c.io.grantOneHot, 8)
+	step(1)
+	expect(c.io.grantOneHot, 8)
+
+	// Inputs 0 and 2
+	poke(c.io.request, 5)
+	step(1)
+	expect(c.io.grantOneHot, 4)
+	step(1)
+	expect(c.io.grantOneHot, 1)
+	step(1)
+	expect(c.io.grantOneHot, 4)
+	step(1)
+	expect(c.io.grantOneHot, 1)
+
+	// Nobody requesting
+	poke(c.io.request, 0)
+	step(1)
+	expect(c.io.grantOneHot, 0)
+	step(1)
+	expect(c.io.grantOneHot, 0)
+}
+

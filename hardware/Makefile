@@ -29,8 +29,11 @@ verilog:
 	./makesrams.py generated_verilog/Top.conf generated_verilog/altera_memories.v
 
 # Unit tests
-axisram:
+axisramtest:
 	sbt "run AxiSram --Wall --backend c --debug --assert --vcd --targetDir generated_cpp --genHarness --compile --test"
+
+arbitertest:
+	sbt "run Arbiter --Wall --backend c --debug --assert --vcd --targetDir generated_cpp --genHarness --compile --test"
 
 clean:
 	rm -rf generated_cpp
