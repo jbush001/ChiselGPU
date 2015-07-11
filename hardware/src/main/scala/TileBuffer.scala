@@ -57,7 +57,8 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	val bytesPerPixel = 4
 
 	val io = new Bundle {
-		// Pixel update interface.  This colors a 2x2 quad per cycle
+		// Pixel update interface.  This colors a 2x2 quad per cycle.  Upper left corner
+		// is 0, 0. Coordinates increase to the right and down.
 		val pixelX = UInt(INPUT, tileCoordBits)
 		val pixelY = UInt(INPUT, tileCoordBits)
 		val pixelMask = UInt(INPUT, 4)
@@ -168,8 +169,8 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	val writebackColor = Mux(enableAlpha, blendedColor, newPixelColorStage2Reg)
 
 	// XXX chisel doesn't support per lane writeback selection. Mux in old value instead
-	val writebackMasked = Vec.tabulate(4) { i => Mux(updatePixelStage2Reg(3 - i), writebackColor(3 - i), 
-		oldPixelColorStage2Reg(3 - i)) }
+	val writebackMasked = Vec.tabulate(4) { i => Mux(updatePixelStage2Reg(i), writebackColor(i), 
+		oldPixelColorStage2Reg(i)) }
 	when (updatePixelStage2Reg != UInt(0)) {
 		colorMemory.write(pixelAddressStage2Reg, writebackMasked)
 	}
@@ -253,5 +254,53 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	io.resolveArbPort.data := writeBufferReg.toBits
 }
 
+// Testbench configures as 32x32 pixels, with 32 byte burst length (8 pixels)
+class TileBufferTest(c : TileBuffer) extends Tester(c) {
+	val bufferSize = 32
+	val burstLength = 8	// number of 32-bit pixels
 
+	// Write some pixels
+	poke(c.io.pixelX, 1)
+	poke(c.io.pixelY, 1)
+	poke(c.io.pixelMask, 15)
+	poke(c.io.pixelColors(0).red, 0xff)
+	poke(c.io.pixelColors(1).red, 0x80)
+	poke(c.io.pixelColors(2).red, 0x40)
+	poke(c.io.pixelColors(3).red, 0x20)
+	step(1)
+	poke(c.io.pixelMask, 0)
+	
+	// Flush pixel pipeline
+	step(3)	
+
+	// Initiate resolve
+	poke(c.io.registerUpdate.update, 1)
+	poke(c.io.registerUpdate.address, 1)  // regids.reg_resolve_base_addr
+	poke(c.io.registerUpdate.value, 64)
+	step(1)
+	poke(c.io.registerUpdate.address, 0)  // regids.reg_start_resolve
+	step(1)
+	poke(c.io.registerUpdate.update, 0)
+	poke(c.io.resolveArbPort.ready, 1)
+	
+	for (resolveCount <- 0 until bufferSize * (bufferSize / burstLength)) {
+		var requestTimeout = 32
+		while (requestTimeout > 0 && peek(c.io.resolveArbPort.request) != 1) {
+			step(1)
+			requestTimeout = requestTimeout - 1
+		}
+		
+		expect(c.io.resolveArbPort.request, 1)
+		expect(c.io.resolveArbPort.address, 64 + resolveCount * burstLength * 4)
+
+		if (resolveCount == (bufferSize / burstLength * 2))
+			expect(c.io.resolveArbPort.data, (BigInt(0xff) << (5 * 32 + 24)) + (BigInt(0x80) << (4 * 32 + 24)))
+		else if (resolveCount == bufferSize / burstLength * 3)
+			expect(c.io.resolveArbPort.data, (BigInt(0x40) << (5 * 32 + 24)) + (BigInt(0x20) << (4 * 32 + 24)))
+		else
+			expect(c.io.resolveArbPort.data, 0)
+
+		step(1)
+	}
+}
 

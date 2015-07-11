@@ -28,7 +28,7 @@ verilog:
 	sbt "run verilog --Wall --backend v --assert --targetDir generated_verilog --noInlineMem"
 	./makesrams.py generated_verilog/Top.conf generated_verilog/altera_memories.v
 
-tests: arbitertest axisramtest memoryarbitertest
+tests: arbitertest axisramtest memoryarbitertest tilebuffertest
 
 # Unit tests
 axisramtest:
@@ -39,6 +39,9 @@ memoryarbitertest:
 
 arbitertest:
 	sbt "run Arbiter --Wall --backend c --debug --assert --vcd --targetDir generated_cpp --genHarness --compile --test"
+
+tilebuffertest:
+	sbt "run TileBuffer --Wall --backend c --debug --assert --vcd --targetDir generated_cpp --genHarness --compile --test"
 
 clean:
 	rm -rf generated_cpp

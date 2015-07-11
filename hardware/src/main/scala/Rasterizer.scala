@@ -99,10 +99,10 @@ class QuadTriangleFunctions extends Module {
 	io.coverageMask := Cat(pixels.map(_.inside))
 	
 	for (i <- 0 until 3) {
-		pixels(0).newEdgeValue(i) := io.newEdgeValue(i)
-		pixels(1).newEdgeValue(i) := io.newEdgeValue(i) + io.xStep(i)
-		pixels(2).newEdgeValue(i) := io.newEdgeValue(i) + io.yStep(i)
-		pixels(3).newEdgeValue(i) := io.newEdgeValue(i) + io.xStep(i) + 
+		pixels(3).newEdgeValue(i) := io.newEdgeValue(i)
+		pixels(2).newEdgeValue(i) := io.newEdgeValue(i) + io.xStep(i)
+		pixels(1).newEdgeValue(i) := io.newEdgeValue(i) + io.yStep(i)
+		pixels(0).newEdgeValue(i) := io.newEdgeValue(i) + io.xStep(i) + 
 			io.yStep(i)
 	}
 }

@@ -34,9 +34,21 @@ sudo port install sbt imagemagick
 
 # Running
 
-cd hardware
-make run
+To run the whole design in simualtion:
+
+    cd hardware
+    make run
 
 Output framebuffer is written to 'output.png'
 The simulator writes a waveform trace to 'trace.vcd'
+
+To run unit tests:
+
+    make tests
+    
+To synthesize:
+ 
+    make verilog
+    
+The result will be in hardware/generated_verilog/
 

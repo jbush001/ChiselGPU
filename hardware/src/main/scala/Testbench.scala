@@ -49,6 +49,8 @@ object main {
 				c => new MemoryArbiterTest(c)}
 			case "Arbiter" => chiselMainTest(chiselMainArgs, () => Module(new Arbiter(4))) {
 				c => new ArbiterTest(c)}
+			case "TileBuffer" => chiselMainTest(chiselMainArgs, () => Module(new TileBuffer(32, 32))) {
+				c => new TileBufferTest(c)}
 		}
 	}
 }
