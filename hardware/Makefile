@@ -32,6 +32,9 @@ verilog:
 axisramtest:
 	sbt "run AxiSram --Wall --backend c --debug --assert --vcd --targetDir generated_cpp --genHarness --compile --test"
 
+memoryarbitertest:
+	sbt "run MemoryArbiter --Wall --backend c --debug --assert --vcd --targetDir generated_cpp --genHarness --compile --test"
+
 arbitertest:
 	sbt "run Arbiter --Wall --backend c --debug --assert --vcd --targetDir generated_cpp --genHarness --compile --test"
 

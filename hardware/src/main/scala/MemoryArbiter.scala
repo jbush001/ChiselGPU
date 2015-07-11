@@ -147,7 +147,8 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 			writeBuffers(i).address := io.writePorts(i).address
 			writeBuffers(i).data := io.writePorts(i).data
 		}
-		.elsewhen (writeStateReg === s_write_burst_complete && activeWriterReg === UInt(i)) {
+		.elsewhen (writeStateReg === s_write_burst_complete && io.axiBus.bvalid
+			&& activeWriterReg === UInt(i)) {
 			assert(writeBuffers(i).latched, "Write burst completed on inactive write buffer")
 			writeBuffers(i).latched := Bool(false)
 		}
@@ -208,4 +209,104 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 	}
 }
 
+class MemoryArbiterTest(c : MemoryArbiter) extends Tester(c) {
+	def makeBurstBuffer(start : Int) : BigInt = (start until start + 8).foldLeft(BigInt(0))((x, y) => (x << 32) + BigInt(y))
+		
+	print(makeBurstBuffer(19))
+		
+	poke(c.io.axiBus.awready, 0)
+	poke(c.io.axiBus.arready, 0)
+	poke(c.io.axiBus.wready, 0)
 
+	// Send four requests simultaneously
+	poke(c.io.readPorts(0).request, 1)
+	poke(c.io.readPorts(0).address, 320)
+	poke(c.io.readPorts(1).request, 1)
+	poke(c.io.readPorts(1).address, 352)
+	poke(c.io.writePorts(0).request, 1)
+	poke(c.io.writePorts(0).address, 96)
+	poke(c.io.writePorts(0).data, makeBurstBuffer(29))
+	poke(c.io.writePorts(1).request, 1)
+	poke(c.io.writePorts(1).address, 128)
+	poke(c.io.writePorts(1).data, makeBurstBuffer(51))
+	expect(c.io.writePorts(0).ready, 1)
+	expect(c.io.writePorts(1).ready, 1)
+	poke(c.io.writePorts(0).request, 1)
+	poke(c.io.writePorts(1).request, 1)
+	step(1)
+	poke(c.io.writePorts(0).request, 0)
+	poke(c.io.writePorts(1).request, 0)
+	step(1)
+	expect(c.io.axiBus.arvalid, 1)
+	expect(c.io.axiBus.awvalid, 1)
+
+	def expectWriteBurst(address : BigInt, dataStart : BigInt) = {
+		// Address
+		expect(c.io.axiBus.awaddr, address) 
+		poke(c.io.axiBus.awready, 1)
+		step(1)
+		poke(c.io.axiBus.awready, 0)
+
+		// Wait four cycles before asserting wready to ensure 
+		// the arbiter waits
+		step(4)
+		poke(c.io.axiBus.wready, 1)
+		for (i <- 0 until 8) {
+			expect(c.io.axiBus.wvalid, 1)
+			expect(c.io.axiBus.wdata, i + dataStart)
+			step(1)
+		}
+
+		poke(c.io.axiBus.wready, 0)
+		expect(c.io.axiBus.wvalid, 0)
+		step(1)
+
+		// Write acknowledgement. Wait four cycles before
+		// acknowledging.
+		expect(c.io.axiBus.bready, 1)
+		step(4)
+		expect(c.io.axiBus.bready, 1)
+		poke(c.io.axiBus.bvalid, 1)
+		step(1)
+		poke(c.io.axiBus.bvalid, 0)
+		step(1)
+	}
+	
+	expectWriteBurst(96, 29)
+	expectWriteBurst(128, 51)
+	
+	def expectReadBurst(address : BigInt, dataStart : BigInt) = {
+		// Address
+		expect(c.io.axiBus.araddr, address) 
+		poke(c.io.axiBus.arready, 1)
+		step(1)
+		poke(c.io.axiBus.arready, 0)
+
+		//
+		// Wait four cycles before asserting rvalid
+		//
+		step(4)
+		poke(c.io.axiBus.rvalid, 1)
+		for (i <- 0 until 8) {
+			expect(c.io.axiBus.rready, 1)
+			poke(c.io.axiBus.rdata, i + dataStart)
+			step(1)
+		}
+
+		poke(c.io.axiBus.rvalid, 0)
+	}
+
+	expectReadBurst(320, 97)
+	expect(c.io.readPorts(0).ack, 1)
+	expect(c.io.readPorts(0).data, makeBurstBuffer(97))
+	step(1)
+	expect(c.io.readPorts(0).ack, 0)
+	step(1)
+
+	expectReadBurst(352, 192)
+	expect(c.io.readPorts(1).ack, 1)
+	expect(c.io.readPorts(1).data, makeBurstBuffer(192))
+	step(1)
+	expect(c.io.readPorts(1).ack, 0)
+	step(1)
+}
