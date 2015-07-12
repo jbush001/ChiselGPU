@@ -31,6 +31,9 @@ import Chisel._
 // interfaces can optimized more efficiently for their own use pattern.
 //
 
+// When a master wants to read, it asserts the request and address signals. 
+// The arbiter will assert the ack signal some number of cycles later. During
+// this cycle, the data signal will also be active.
 class ArbiterReadPort(burstByteCount : Int) extends Bundle {
 	val request = Bool(INPUT)
 	val ack = Bool(OUTPUT) 
@@ -40,6 +43,10 @@ class ArbiterReadPort(burstByteCount : Int) extends Bundle {
 	override def clone = new ArbiterReadPort(burstByteCount).asInstanceOf[this.type]
 }
 
+// When a master wants to write, it asserts the request, address, and data lines.  
+// The arbiter asserts read when it can accept a request. request and ready are
+// not dependent on each other. When both request and ready are active in a cycle,
+// the request has been accepted.
 class ArbiterWritePort(burstByteCount : Int) extends Bundle {
 	val request = Bool(INPUT)
 	val ready = Bool(OUTPUT) 

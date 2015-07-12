@@ -17,10 +17,11 @@
 import Chisel._
 
 //
-// Round robin arbiter. Given a bitmap of requestors, set a grant
-// signal to indicate which should receive access.  There is already
-// RRArbiter in the standard library, but I couldn't get it to do
-// quite what I wanted. Should investigate switching to that.
+// Round robin arbiter. Given a bitmap of requestors, set one bit
+// in the a grant signal to indicate which should receive access.  
+// There is already RRArbiter in the standard library, but I couldn't 
+// figure out how to get it to do quite what I wanted. Should investigate 
+// switching to that.
 //
 class Arbiter(numInputs : Int) extends Module {
 	

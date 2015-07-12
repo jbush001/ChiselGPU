@@ -21,11 +21,17 @@ object StepDir {
 }
 
 //
-// Rasterizer. This sweeps over the triangle in a fashion similar to that
+// Given a triangle, the rasterizer determines which pixels it covers.
+// This sweeps over the triangle in a fashion similar to that
 // described by Pineda "A parallel algorithm for polygon rasterization"
-// (SIGGRAPH 88), Figure 4. It outputs 2x2 aligned quads with coverage masks.
+// (SIGGRAPH 88), Figure 4. It outputs 2x2 aligned quads with one bit per pixel
+// to indicate coverage.
 //
 
+//
+// An edge function determines whether a pixel is on the left or right
+// side of a line segment.
+//
 class EdgeFunction extends Module {
 	val io = new Bundle {
 		val stepDir = UInt(INPUT, 2)
@@ -53,6 +59,10 @@ class EdgeFunction extends Module {
 	io.inside := edgeValue(31)
 }
 
+//
+// Computes three edge functions simulatenously to determine if a pixel
+// is inside a triangle.
+//
 class TriangleFunction extends Module {
 	val io = new Bundle {
 		val xStep = Vec.fill(3)(SInt(INPUT, 32))
@@ -75,7 +85,8 @@ class TriangleFunction extends Module {
 	io.inside := edges.map(_.inside).reduceLeft(_ && _)
 }
 
-// Computes coverage for a quad (2x2 chunk of pixels)
+// Determines which pixels of a 2x2 pixel quad are covered by
+// a triangle.
 // 0 1
 // 2 3
 class QuadTriangleFunctions extends Module {

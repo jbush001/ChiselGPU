@@ -46,7 +46,8 @@ class RGBAColor extends Bundle {
 	val alpha = UInt(width = 8)
 }
 
-// tileSize is pixels
+// tileSize is number of horizontal and vertical pixels contained in the
+// tile. A tile must be square, and tileSize must be a power of two.
 class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	val tileSizeQuads = tileSize / 2
 	val tileCoordBits = log2Up(tileSizeQuads)	// Divide by two to use the quad bits

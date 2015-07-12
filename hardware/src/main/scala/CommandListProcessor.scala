@@ -22,7 +22,8 @@ import Chisel._
 // functional units.
 //
 
-// Broadcasts register updates to other internal function units
+// All units that have control registers monitor this bus. The CommandListProcessor
+// broadcasts register updates on it.
 class RegisterUpdate extends Bundle {
 	val update = Bool(OUTPUT)
 	val address = UInt(OUTPUT, 8)
