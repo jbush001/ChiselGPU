@@ -45,12 +45,14 @@ object main {
 			case "simulation" => chiselMain(chiselMainArgs, () => Module(new Testbench()))
 			case "AxiSram" => chiselMainTest(chiselMainArgs, () => Module(new AxiSram(32, 1024))) {
 				c => new AxiSramTest(c)}
-			case "MemoryArbiter" => chiselMainTest(chiselMainArgs, () => Module(new MemoryArbiter(2, 2, 32, 32))) {
+			case "MemoryArbiter" => chiselMainTest(chiselMainArgs, () => Module(new MemoryArbiter(2, 2, 32))) {
 				c => new MemoryArbiterTest(c)}
 			case "Arbiter" => chiselMainTest(chiselMainArgs, () => Module(new Arbiter(4))) {
 				c => new ArbiterTest(c)}
-			case "TileBuffer" => chiselMainTest(chiselMainArgs, () => Module(new TileBuffer(32, 32))) {
+			case "TileBuffer" => chiselMainTest(chiselMainArgs, () => Module(new TileBuffer(32))) {
 				c => new TileBufferTest(c)}
+			case "VertexMemory" => chiselMainTest(chiselMainArgs, () => Module(new VertexMemory(2, 2, 32))) {
+				c => new VertexMemoryTest(c)}
 		}
 	}
 }

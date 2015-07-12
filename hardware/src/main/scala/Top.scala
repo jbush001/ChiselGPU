@@ -28,9 +28,9 @@ class Top (dataWidth : Int) extends Module {
 
 	val tileSize = 64
 
-	val busArbiter = Module(new MemoryArbiter(2, 2, 32, 32))
-	val tileBuffer = Module(new TileBuffer(tileSize, 32))
-	val commandListProcessor = Module(new CommandListProcessor(32))
+	val busArbiter = Module(new MemoryArbiter(2, 2, 32))
+	val tileBuffer = Module(new TileBuffer(tileSize))
+	val commandListProcessor = Module(new CommandListProcessor())
 	val rasterizer = Module(new Rasterizer(tileSize / 2))
 
 	busArbiter.io.axiBus <> io.axiBus

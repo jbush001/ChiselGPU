@@ -34,8 +34,6 @@ import Chisel._
 // Open Questions/To do:
 // - How to clear the framebuffer efficiently?  Do it during resolve?
 // - Stencil and depth buffers are not implemented yet
-// - Use advanced parameterization for tile size and burstByteCount
-//   (https://chisel.eecs.berkeley.edu/2.2.0/chisel-parameters.pdf)
 // - How does early-Z connect with this module?
 //
 
@@ -48,7 +46,7 @@ class RGBAColor extends Bundle {
 
 // tileSize is number of horizontal and vertical pixels contained in the
 // tile. A tile must be square, and tileSize must be a power of two.
-class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
+class TileBuffer(tileSize : Int) extends Module {
 	val tileSizeQuads = tileSize / 2
 	val tileCoordBits = log2Up(tileSizeQuads)	// Divide by two to use the quad bits
 	val colorChannelBits = 8
@@ -64,7 +62,7 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 		val pixelY = UInt(INPUT, tileCoordBits)
 		val pixelMask = UInt(INPUT, 4)
 		val pixelColors = Vec.fill(4){ (new RGBAColor).asInput }
-		val resolveArbPort = new ArbiterWritePort(burstByteCount).flip
+		val resolveArbPort = new MemoryArbiterWritePort().flip
 		val registerUpdate = new RegisterUpdate().flip
 		val resolveActive = Bool(OUTPUT)
 	}
@@ -181,7 +179,7 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 	// order, but they are stored in 2x2 quads. Shuffle and accumulate into
 	// a burst buffer.
 	//
-	val numLanes = burstByteCount / 8	// 8 bytes per memory read
+	val numLanes = memconsts.burstBytes / 8	// 8 bytes per memory read
 	val laneBits = log2Up(numLanes)
 	val writeBufferReg = Reg(Vec.fill(numLanes) { UInt(width = 64) })
 	val resolveXQuadReg = Reg(UInt(width = tileCoordBits))
@@ -240,13 +238,13 @@ class TileBuffer(tileSize : Int, burstByteCount : Int) extends Module {
 
 				when (resolveXQuadReg === UInt(0)) {
 					// The column addr has wrapped; we reached the end of the line.
-					resolveWriteAddressReg := resolveWriteAddressReg + UInt(burstByteCount) + 
+					resolveWriteAddressReg := resolveWriteAddressReg + UInt(memconsts.burstBytes) + 
 						resolveStride
 					resolveYCoordReg := resolveYCoordReg + UInt(1)
 				}
 				.otherwise {
 					// Next burst in same row
-					resolveWriteAddressReg := resolveWriteAddressReg + UInt(burstByteCount)
+					resolveWriteAddressReg := resolveWriteAddressReg + UInt(memconsts.burstBytes)
 				}
 			}
 		}

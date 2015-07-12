@@ -31,41 +31,41 @@ import Chisel._
 // interfaces can optimized more efficiently for their own use pattern.
 //
 
+object memconsts 
+{
+	val burstBytes = 32
+}
+
 // When a master wants to read, it asserts the request and address signals. 
 // The arbiter will assert the ack signal some number of cycles later. During
 // this cycle, the data signal will also be active.
-class ArbiterReadPort(burstByteCount : Int) extends Bundle {
+class MemoryArbiterReadPort extends Bundle {
 	val request = Bool(INPUT)
 	val ack = Bool(OUTPUT) 
 	val address = UInt(INPUT, 32)
-	val data = UInt(OUTPUT, burstByteCount * 8)
-	
-	override def clone = new ArbiterReadPort(burstByteCount).asInstanceOf[this.type]
+	val data = UInt(OUTPUT, memconsts.burstBytes * 8)
 }
 
-// When a master wants to write, it asserts the request, address, and data lines.  
-// The arbiter asserts read when it can accept a request. request and ready are
-// not dependent on each other. When both request and ready are active in a cycle,
-// the request has been accepted.
-class ArbiterWritePort(burstByteCount : Int) extends Bundle {
+// When a master wants to write, it asserts the request, address, and data 
+// signals. The arbiter asserts read when it can accept a request. request and 
+// ready are not dependent on each other. When both request and ready are 
+// active in a cycle, the request has been accepted.
+class MemoryArbiterWritePort extends Bundle {
 	val request = Bool(INPUT)
 	val ready = Bool(OUTPUT) 
 	val address = UInt(INPUT, 32)
-	val data = UInt(INPUT, burstByteCount * 8)
-
-	override def clone = new ArbiterWritePort(burstByteCount).asInstanceOf[this.type]
+	val data = UInt(INPUT, memconsts.burstBytes * 8)
 }
 
-class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : Int, 
-	burstByteCount : Int) extends Module {
+class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : Int) extends Module {
 
 	val io = new Bundle {
-		val readPorts = Vec.fill(numReadPorts)(new ArbiterReadPort(burstByteCount))
-		val writePorts = Vec.fill(numWritePorts)(new ArbiterWritePort(burstByteCount))
+		val readPorts = Vec.fill(numReadPorts)(new MemoryArbiterReadPort)
+		val writePorts = Vec.fill(numWritePorts)(new MemoryArbiterWritePort)
 		val axiBus = new Axi4Master(axiDataWidthBits)
 	}
 
-	val burstTransferCount = burstByteCount / (axiDataWidthBits / 8)
+	val burstTransferCount = memconsts.burstBytes / (axiDataWidthBits / 8)
 
 	def convertToVec(bitArray : UInt, bitsPerElement : Int) = Vec.tabulate(bitArray.getWidth() /
 		bitsPerElement)((i : Int) => bitArray((i + 1) * bitsPerElement - 1, i * bitsPerElement))
@@ -75,7 +75,7 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 	//
 	val s_read_idle :: s_send_read_addr :: s_read_burst_active :: s_read_burst_complete :: Nil = Enum(UInt(), 4)
 	val readStateReg = Reg(init = s_read_idle)
-	val readDataReg = Reg(UInt(width = burstByteCount * 8))
+	val readDataReg = Reg(UInt(width = memconsts.burstBytes * 8))
 	val activeReaderReg = Reg(UInt(width = log2Up(numReadPorts)))
 	val readBurstCountReg = Reg(UInt(width = log2Up(burstTransferCount)))
 
@@ -88,7 +88,7 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 	io.axiBus.arvalid := readStateReg === s_send_read_addr
 	io.axiBus.araddr := io.readPorts(activeReaderReg).address
 	io.axiBus.arlen := UInt(burstTransferCount - 1)
-	io.axiBus.arsize := UInt(log2Down(burstByteCount))
+	io.axiBus.arsize := UInt(log2Down(memconsts.burstBytes))
 	io.axiBus.rready := readStateReg === s_read_burst_active
 	val readLanes = convertToVec(readDataReg, axiDataWidthBits)
 	val readArbiter = Module(new Arbiter(numReadPorts))
@@ -141,7 +141,7 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 	class WriteBuffer extends Bundle {
 		val latched = Bool()
 		val address = UInt(width = 32)
-		val data = UInt(width = burstByteCount * 8)
+		val data = UInt(width = memconsts.burstBytes * 8)
 
 		override def clone = (new WriteBuffer).asInstanceOf[this.type]
 	}
@@ -164,7 +164,7 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 	io.axiBus.awvalid := writeStateReg === s_send_write_addr
 	io.axiBus.awaddr := writeBuffers(activeWriterReg).address
 	io.axiBus.awlen := UInt(burstTransferCount - 1)
-	io.axiBus.awsize := UInt(log2Down(burstByteCount))
+	io.axiBus.awsize := UInt(log2Down(memconsts.burstBytes))
 	io.axiBus.wvalid := writeStateReg === s_write_burst_active
 
 	// Select the appropriate write data

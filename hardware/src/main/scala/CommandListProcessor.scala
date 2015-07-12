@@ -38,10 +38,10 @@ object regids {
 		Nil) = Enum(UInt(), 4)
 }
 
-class CommandListProcessor(burstByteCount : Int) extends Module {
+class CommandListProcessor extends Module {
 	val io = new Bundle {
 		val registerUpdate = new RegisterUpdate
-		val arbiterPort = new ArbiterReadPort(burstByteCount).flip
+		val arbiterPort = new MemoryArbiterReadPort().flip
 		val HACK_resolve = Bool(INPUT)
 	}
 
