@@ -98,54 +98,44 @@ class AxiSram(dataWidth : Int, size : Int) extends Module {
 }
 
 class AxiSramTest(c : AxiSram) extends Tester(c) {
-	// Write to memory
-	poke(c.io.awvalid, 0)
-	poke(c.io.awaddr, 0)
-	poke(c.io.awlen, 0)
-	poke(c.io.awsize, 0)
-	poke(c.io.wvalid, 0)
-	poke(c.io.wlast, 0)
-	poke(c.io.wdata, 0)
-	poke(c.io.bready, 0)
-	poke(c.io.arvalid, 0)
-	poke(c.io.araddr, 0)
-	poke(c.io.arlen, 0)
-	poke(c.io.arsize, 0)
-	poke(c.io.rready, 0)
-	step(1)
-
-	// Write Burst
-	poke(c.io.awvalid, 1)
-	poke(c.io.awaddr, 64)
-	poke(c.io.awlen, 7)
-	step(1)
-	poke(c.io.awvalid, 0)
-	step(1)
-	for (x <- 0 until 8) {
-		poke(c.io.wvalid, 1)
-		poke(c.io.wdata, x + 12345)
-		expect(c.io.wready, 1)
+	for (burstCount <- 0 until 2) {
+		val baseDataValue = burstCount * 12345
+		val burstAddress = burstCount * 256
+		
+		// Write Burst
+		poke(c.io.awvalid, 1)
+		expect(c.io.awready, 1)
+		poke(c.io.awaddr, burstAddress)
+		poke(c.io.awlen, 7)
 		step(1)
-	}
+		poke(c.io.awvalid, 0)
+		step(1)
+		for (x <- 0 until 8) {
+			poke(c.io.wvalid, 1)
+			poke(c.io.wdata, x + baseDataValue)
+			expect(c.io.wready, 1)
+			step(1)
+		}
 
-	poke(c.io.wvalid, 0)
-	poke(c.io.bready, 1)
-	step(1)
+		poke(c.io.wvalid, 0)
+		poke(c.io.bready, 1)
+		step(1)
 	
-	// Read Burst
-	poke(c.io.arvalid, 1)
-	poke(c.io.araddr, 64)
-	poke(c.io.arlen, 7)
-	expect(c.io.arready, 1)
-	step(1)
-	poke(c.io.arvalid, 0)
-	poke(c.io.rready, 1)
-	for (x <- 0 until 8) {
-		step(1)
-		expect(c.io.rvalid, 1)
-		expect(c.io.rdata, x + 12345)
-	}
+		// Read burst. Validate value we just wrote
+		poke(c.io.arvalid, 1)
+		expect(c.io.arready, 1)
+		poke(c.io.araddr, burstAddress)
+		poke(c.io.arlen, 7)
+		step(2)
+		poke(c.io.arvalid, 0)
+		poke(c.io.rready, 1)
+		for (x <- 0 until 8) {
+			expect(c.io.rvalid, 1)
+			expect(c.io.rdata, x + baseDataValue)
+			step(1)
+		}
 
-	poke(c.io.rready, 0)
-	step(1)
+		poke(c.io.rready, 0)
+		step(2)
+	}
 }
