@@ -193,7 +193,7 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 		}
 		
 		is (s_send_write_addr) {
-			when (io.axiBus.awvalid) {
+			when (io.axiBus.awready) {
 				writeStateReg := s_write_burst_active
 				writeBurstCountReg := UInt(0)
 			}
@@ -218,37 +218,10 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 
 class MemoryArbiterTest(c : MemoryArbiter) extends Tester(c) {
 	def makeBurstBuffer(start : Int) : BigInt = (start until start + 8).foldLeft(BigInt(0))((x, y) => (x << 32) + BigInt(y))
-		
-	print(makeBurstBuffer(19))
-		
-	poke(c.io.axiBus.awready, 0)
-	poke(c.io.axiBus.arready, 0)
-	poke(c.io.axiBus.wready, 0)
-
-	// Send four requests simultaneously
-	poke(c.io.readPorts(0).request, 1)
-	poke(c.io.readPorts(0).address, 320)
-	poke(c.io.readPorts(1).request, 1)
-	poke(c.io.readPorts(1).address, 352)
-	poke(c.io.writePorts(0).request, 1)
-	poke(c.io.writePorts(0).address, 96)
-	poke(c.io.writePorts(0).data, makeBurstBuffer(29))
-	poke(c.io.writePorts(1).request, 1)
-	poke(c.io.writePorts(1).address, 128)
-	poke(c.io.writePorts(1).data, makeBurstBuffer(51))
-	expect(c.io.writePorts(0).ready, 1)
-	expect(c.io.writePorts(1).ready, 1)
-	poke(c.io.writePorts(0).request, 1)
-	poke(c.io.writePorts(1).request, 1)
-	step(1)
-	poke(c.io.writePorts(0).request, 0)
-	poke(c.io.writePorts(1).request, 0)
-	step(1)
-	expect(c.io.axiBus.arvalid, 1)
-	expect(c.io.axiBus.awvalid, 1)
 
 	def expectWriteBurst(address : BigInt, dataStart : BigInt) = {
 		// Address
+		expect(c.io.axiBus.awvalid, 1)
 		expect(c.io.axiBus.awaddr, address) 
 		poke(c.io.axiBus.awready, 1)
 		step(1)
@@ -278,12 +251,10 @@ class MemoryArbiterTest(c : MemoryArbiter) extends Tester(c) {
 		poke(c.io.axiBus.bvalid, 0)
 		step(1)
 	}
-	
-	expectWriteBurst(96, 29)
-	expectWriteBurst(128, 51)
-	
+
 	def expectReadBurst(address : BigInt, dataStart : BigInt) = {
 		// Address
+		expect(c.io.axiBus.arvalid, 1)
 		expect(c.io.axiBus.araddr, address) 
 		poke(c.io.axiBus.arready, 1)
 		step(1)
@@ -302,18 +273,51 @@ class MemoryArbiterTest(c : MemoryArbiter) extends Tester(c) {
 
 		poke(c.io.axiBus.rvalid, 0)
 	}
+	
+	for (i <- 0 until 4) {	
+		val baseAddress = i * 320
+		val patternStart = i * 12345
+		
+		// Send four requests simultaneously
+		poke(c.io.readPorts(0).request, 1)
+		poke(c.io.readPorts(0).address, baseAddress)
+		poke(c.io.readPorts(1).request, 1)
+		poke(c.io.readPorts(1).address, baseAddress + 32)
+		poke(c.io.writePorts(0).request, 1)
+		poke(c.io.writePorts(0).address, baseAddress + 64)
+		poke(c.io.writePorts(0).data, makeBurstBuffer(patternStart))
+		poke(c.io.writePorts(1).request, 1)
+		poke(c.io.writePorts(1).address, baseAddress + 96)
+		poke(c.io.writePorts(1).data, makeBurstBuffer(patternStart + 32))
+		expect(c.io.writePorts(0).ready, 1)
+		expect(c.io.writePorts(1).ready, 1)
+		poke(c.io.writePorts(0).request, 1)
+		poke(c.io.writePorts(1).request, 1)
+		step(1)
+		poke(c.io.writePorts(0).request, 0)
+		poke(c.io.writePorts(1).request, 0)
+		step(1)
 
-	expectReadBurst(320, 97)
-	expect(c.io.readPorts(0).ack, 1)
-	expect(c.io.readPorts(0).data, makeBurstBuffer(97))
-	step(1)
-	expect(c.io.readPorts(0).ack, 0)
-	step(1)
+		// Write Burst 1
+		expectWriteBurst(baseAddress + 64, patternStart)
+		
+		// Read Burst 1
+		expectReadBurst(baseAddress, patternStart + 64)
+		expect(c.io.readPorts(0).ack, 1)
+		expect(c.io.readPorts(0).data, makeBurstBuffer(patternStart + 64))
+		step(1)
+		expect(c.io.readPorts(0).ack, 0)
+		step(1)
 
-	expectReadBurst(352, 192)
-	expect(c.io.readPorts(1).ack, 1)
-	expect(c.io.readPorts(1).data, makeBurstBuffer(192))
-	step(1)
-	expect(c.io.readPorts(1).ack, 0)
-	step(1)
+		// Write Burst 2
+		expectWriteBurst(baseAddress + 96, patternStart + 32)
+
+		// Read Burst 2
+		expectReadBurst(baseAddress + 32, patternStart + 96)
+		expect(c.io.readPorts(1).ack, 1)
+		expect(c.io.readPorts(1).data, makeBurstBuffer(patternStart + 96))
+		step(1)
+		expect(c.io.readPorts(1).ack, 0)
+		step(1)
+	}
 }
