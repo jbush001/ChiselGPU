@@ -22,35 +22,35 @@ import Chisel._
 //
 
 class Testbench extends Module {
-	val io = new Bundle {
-		val halfClock = UInt(OUTPUT)	// Allows seeing clock in waveform
-		val halt = Bool(OUTPUT)
-	}
+    val io = new Bundle {
+        val halfClock = UInt(OUTPUT)    // Allows seeing clock in waveform
+        val halt = Bool(OUTPUT)
+    }
 
-	val top = Module(new Top(32))
-	val systemMemory = Module(new AxiSram(32, 64 * 64))
-	top.io.axiBus <> systemMemory.io
-	io.halt := top.io.halt
+    val top = Module(new Top(32))
+    val systemMemory = Module(new AxiSram(32, 64 * 64))
+    top.io.axiBus <> systemMemory.io
+    io.halt := top.io.halt
 
-	val DEBUG_halfClockReg = Reg(Bool())
-	DEBUG_halfClockReg := !DEBUG_halfClockReg
-	io.halfClock := DEBUG_halfClockReg
+    val DEBUG_halfClockReg = Reg(Bool())
+    DEBUG_halfClockReg := !DEBUG_halfClockReg
+    io.halfClock := DEBUG_halfClockReg
 }
 
 object main {
-	def main(args: Array[String]): Unit = {
-		val chiselMainArgs = args.slice(1, args.length)
-		args(0) match {
-			case "verilog" => chiselMain(chiselMainArgs, () => Module(new Top(32)))
-			case "simulation" => chiselMain(chiselMainArgs, () => Module(new Testbench()))
-			case "AxiSram" => chiselMainTest(chiselMainArgs, () => Module(new AxiSram(32, 1024))) {
-				c => new AxiSramTest(c)}
-			case "MemoryArbiter" => chiselMainTest(chiselMainArgs, () => Module(new MemoryArbiter(2, 2, 32))) {
-				c => new MemoryArbiterTest(c)}
-			case "Arbiter" => chiselMainTest(chiselMainArgs, () => Module(new Arbiter(4))) {
-				c => new ArbiterTest(c)}
-			case "TileBuffer" => chiselMainTest(chiselMainArgs, () => Module(new TileBuffer(32))) {
-				c => new TileBufferTest(c)}
-		}
-	}
+    def main(args: Array[String]): Unit = {
+        val chiselMainArgs = args.slice(1, args.length)
+        args(0) match {
+            case "verilog" => chiselMain(chiselMainArgs, () => Module(new Top(32)))
+            case "simulation" => chiselMain(chiselMainArgs, () => Module(new Testbench()))
+            case "AxiSram" => chiselMainTest(chiselMainArgs, () => Module(new AxiSram(32, 1024))) {
+                c => new AxiSramTest(c)}
+            case "MemoryArbiter" => chiselMainTest(chiselMainArgs, () => Module(new MemoryArbiter(2, 2, 32))) {
+                c => new MemoryArbiterTest(c)}
+            case "Arbiter" => chiselMainTest(chiselMainArgs, () => Module(new Arbiter(4))) {
+                c => new ArbiterTest(c)}
+            case "TileBuffer" => chiselMainTest(chiselMainArgs, () => Module(new TileBuffer(32))) {
+                c => new TileBufferTest(c)}
+        }
+    }
 }

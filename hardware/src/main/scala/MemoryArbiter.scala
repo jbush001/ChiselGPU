@@ -1,12 +1,12 @@
-// 
+//
 // Copyright 2015 Jeff Bush
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,28 +31,28 @@ import Chisel._
 // interfaces can optimized more efficiently for their own use pattern.
 //
 
-object memconsts 
+object memconsts
 {
 	val burstBytes = 32
 }
 
-// When a master wants to read, it asserts the request and address signals. 
+// When a master wants to read, it asserts the request and address signals.
 // The arbiter will assert the ack signal some number of cycles later. During
 // this cycle, the data signal will also be active.
 class MemoryArbiterReadPort extends Bundle {
 	val request = Bool(INPUT)
-	val ack = Bool(OUTPUT) 
+	val ack = Bool(OUTPUT)
 	val address = UInt(INPUT, 32)
 	val data = UInt(OUTPUT, memconsts.burstBytes * 8)
 }
 
-// When a master wants to write, it asserts the request, address, and data 
-// signals. The arbiter asserts read when it can accept a request. request and 
-// ready are not dependent on each other. When both request and ready are 
+// When a master wants to write, it asserts the request, address, and data
+// signals. The arbiter asserts read when it can accept a request. request and
+// ready are not dependent on each other. When both request and ready are
 // active in a cycle, the request has been accepted.
 class MemoryArbiterWritePort extends Bundle {
 	val request = Bool(INPUT)
-	val ready = Bool(OUTPUT) 
+	val ready = Bool(OUTPUT)
 	val address = UInt(INPUT, 32)
 	val data = UInt(INPUT, memconsts.burstBytes * 8)
 }
@@ -81,7 +81,7 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 
 	for (i <- 0 until numReadPorts ) {
 		io.readPorts(i).data := readDataReg
-		io.readPorts(i).ack := (readStateReg === s_read_burst_complete) && 
+		io.readPorts(i).ack := (readStateReg === s_read_burst_complete) &&
 			(activeReaderReg === UInt(i))
 	}
 
@@ -95,7 +95,7 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 	var readRequestBitmap = UInt(io.readPorts(0).request && readStateReg === s_read_idle)
 	for (i <- 1 until numReadPorts)
 		readRequestBitmap = Cat(io.readPorts(i).request && readStateReg === s_read_idle, readRequestBitmap)
-	
+
 	readArbiter.io.request := readRequestBitmap
 	readArbiter.io.enableUpdate := Bool(true)
 
@@ -107,7 +107,7 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 				readStateReg := s_send_read_addr
 			}
 		}
-		
+
 		is (s_send_read_addr) {
 			when (io.axiBus.arready) {
 				readStateReg := s_read_burst_active
@@ -171,10 +171,10 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 	val writeData = writeBuffers(activeWriterReg).data
 	val writeLanes = convertToVec(writeData, axiDataWidthBits)
 	io.axiBus.wdata := writeLanes(~writeBurstCountReg)
-	io.axiBus.wlast := (writeBurstCountReg === UInt(burstTransferCount - 1)) && 
+	io.axiBus.wlast := (writeBurstCountReg === UInt(burstTransferCount - 1)) &&
 		(writeStateReg === s_write_burst_active)
 	io.axiBus.bready := writeStateReg === s_write_burst_complete
-	
+
 	val writeArbiter = Module(new Arbiter(numWritePorts))
 	var writeRequestBitmap = UInt(writeBuffers(0).latched && writeStateReg === s_write_idle)
 	for (i <- 1 until numWritePorts)
@@ -191,14 +191,14 @@ class MemoryArbiter(numReadPorts : Int, numWritePorts : Int, axiDataWidthBits : 
 				writeStateReg := s_send_write_addr
 			}
 		}
-		
+
 		is (s_send_write_addr) {
 			when (io.axiBus.awready) {
 				writeStateReg := s_write_burst_active
 				writeBurstCountReg := UInt(0)
 			}
 		}
-		
+
 		is (s_write_burst_active) {
 			when (io.axiBus.wready) {
 				writeBurstCountReg := writeBurstCountReg + UInt(1)
@@ -222,12 +222,12 @@ class MemoryArbiterTest(c : MemoryArbiter) extends Tester(c) {
 	def expectWriteBurst(address : BigInt, dataStart : BigInt) = {
 		// Address
 		expect(c.io.axiBus.awvalid, 1)
-		expect(c.io.axiBus.awaddr, address) 
+		expect(c.io.axiBus.awaddr, address)
 		poke(c.io.axiBus.awready, 1)
 		step(1)
 		poke(c.io.axiBus.awready, 0)
 
-		// Wait four cycles before asserting wready to ensure 
+		// Wait four cycles before asserting wready to ensure
 		// the arbiter waits
 		step(4)
 		poke(c.io.axiBus.wready, 1)
@@ -255,7 +255,7 @@ class MemoryArbiterTest(c : MemoryArbiter) extends Tester(c) {
 	def expectReadBurst(address : BigInt, dataStart : BigInt) = {
 		// Address
 		expect(c.io.axiBus.arvalid, 1)
-		expect(c.io.axiBus.araddr, address) 
+		expect(c.io.axiBus.araddr, address)
 		poke(c.io.axiBus.arready, 1)
 		step(1)
 		poke(c.io.axiBus.arready, 0)
@@ -273,11 +273,11 @@ class MemoryArbiterTest(c : MemoryArbiter) extends Tester(c) {
 
 		poke(c.io.axiBus.rvalid, 0)
 	}
-	
-	for (i <- 0 until 4) {	
+
+	for (i <- 0 until 4) {
 		val baseAddress = i * 320
 		val patternStart = i * 12345
-		
+
 		// Send four requests simultaneously
 		poke(c.io.readPorts(0).request, 1)
 		poke(c.io.readPorts(0).address, baseAddress)
@@ -300,7 +300,7 @@ class MemoryArbiterTest(c : MemoryArbiter) extends Tester(c) {
 
 		// Write Burst 1
 		expectWriteBurst(baseAddress + 64, patternStart)
-		
+
 		// Read Burst 1
 		expectReadBurst(baseAddress, patternStart + 64)
 		expect(c.io.readPorts(0).ack, 1)
