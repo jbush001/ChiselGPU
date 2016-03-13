@@ -131,8 +131,6 @@ int main (int argc, char* argv[])
         }
     }
 
-    Testbench_api_t *api = new Testbench_api_t();
-    api->init(module);
     FILE *waveformFile = nullptr;
     if (enableWaveform)
     {
