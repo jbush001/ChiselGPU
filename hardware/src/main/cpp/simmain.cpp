@@ -17,7 +17,7 @@
 #include <getopt.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "TestBench.h"
+#include "Testbench.h"
 
 namespace
 {
